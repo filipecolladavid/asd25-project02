@@ -12,12 +12,12 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import protocols.abd.ABD;
-import protocols.abd.renotifications.ReadCompleteNotification;
-import protocols.abd.renotifications.UpdateValueNotification;
-import protocols.abd.renotifications.WriteCompleteNotification;
-import protocols.abd.requests.ReadRequest;
-import protocols.abd.requests.WriteRequest;
+// import protocols.abd.ABD;
+// import protocols.abd.renotifications.ReadCompleteNotification;
+// import protocols.abd.renotifications.UpdateValueNotification;
+// import protocols.abd.renotifications.WriteCompleteNotification;
+// import protocols.abd.requests.ReadRequest;
+// import protocols.abd.requests.WriteRequest;
 import protocols.app.messages.RequestMessage;
 import protocols.app.messages.ResponseMessage;
 import protocols.app.requests.CurrentStateReply;
@@ -100,9 +100,9 @@ public class HashApp extends GenericProtocol {
 
 		/*-------------------- Register Execute Notification Handler --------------- */
 		subscribeNotification(ExecuteNotification.NOTIFICATION_ID, this::uponExecuteNotification); //For Paxos interaction
-		subscribeNotification(ReadCompleteNotification.NOTIFICATION_ID, this::uponReadCompleteNotification); //For ABD interaction
-		subscribeNotification(WriteCompleteNotification.NOTIFICATION_ID, this::uponWriteCompleteNotification); //For ABD interaction
-		subscribeNotification(UpdateValueNotification.NOTIFICATION_ID, this::uponUpdateValueNotification); //For ABD interaction
+		// subscribeNotification(ReadCompleteNotification.NOTIFICATION_ID, this::uponReadCompleteNotification); //For ABD interaction
+		// subscribeNotification(WriteCompleteNotification.NOTIFICATION_ID, this::uponWriteCompleteNotification); //For ABD interaction
+		// subscribeNotification(UpdateValueNotification.NOTIFICATION_ID, this::uponUpdateValueNotification); //For ABD interaction
 
 		/*-------------------- Register Request Handler ---------------------------- */
 		registerRequestHandler(CurrentStateRequest.REQUEST_ID, this::uponCurrentStateRequest);
@@ -153,19 +153,19 @@ public class HashApp extends GenericProtocol {
 				System.exit(1);
 			}
 		} else {
-			//ABD interaction
-			if(msg.getOpType() == RequestMessage.READ) {
+			// //ABD interaction
+			// if(msg.getOpType() == RequestMessage.READ) {
 
-				sendRequest(new ReadRequest(opUUID, msg.getKey().getBytes()), ABD.PROTOCOL_ID);
+			// 	sendRequest(new ReadRequest(opUUID, msg.getKey().getBytes()), ABD.PROTOCOL_ID);
 
-			} else if (msg.getOpType() == RequestMessage.WRITE) {
+			// } else if (msg.getOpType() == RequestMessage.WRITE) {
 
-				sendRequest(new WriteRequest(opUUID, msg.getKey().getBytes(), msg.getData()), ABD.PROTOCOL_ID);
+			// 	sendRequest(new WriteRequest(opUUID, msg.getKey().getBytes(), msg.getData()), ABD.PROTOCOL_ID);
 
-			} else {
-				System.err.println("Invalid client operation");
-				System.exit(1);
-			}
+			// } else {
+			// 	System.err.println("Invalid client operation");
+			// 	System.exit(1);
+			// }
 		}
 	}
 
@@ -207,35 +207,35 @@ public class HashApp extends GenericProtocol {
 
 	}
 
-	//The following 3 handlers are are executed only for the abd stack
-	private void uponReadCompleteNotification(ReadCompleteNotification not, short sourceProto) {
-		String key = new String(not.getKey(),0,not.getKey().length);
-		this.data.put(key, not.getValue());
+	// //The following 3 handlers are are executed only for the abd stack
+	// private void uponReadCompleteNotification(ReadCompleteNotification not, short sourceProto) {
+	// 	String key = new String(not.getKey(),0,not.getKey().length);
+	// 	this.data.put(key, not.getValue());
 		
-		Pair<Host, Long> pair = clientIdMapper.remove(not.getOpId());
+	// 	Pair<Host, Long> pair = clientIdMapper.remove(not.getOpId());
 		
-		sendMessage(new ResponseMessage(pair.getRight(), data.getOrDefault(key, new byte[0])), pair.getLeft());
+	// 	sendMessage(new ResponseMessage(pair.getRight(), data.getOrDefault(key, new byte[0])), pair.getLeft());
 
-		this.updateOperationCountAndPrintHash();
-	}
+	// 	this.updateOperationCountAndPrintHash();
+	// }
 
-	private void uponWriteCompleteNotification(WriteCompleteNotification not, short sourceProto) {
-		String key = new String(not.getKey(),0,not.getKey().length);
-		this.data.put(key, not.getValue());
+	// private void uponWriteCompleteNotification(WriteCompleteNotification not, short sourceProto) {
+	// 	String key = new String(not.getKey(),0,not.getKey().length);
+	// 	this.data.put(key, not.getValue());
 		
-		Pair<Host, Long> pair = clientIdMapper.remove(not.getOpId());
+	// 	Pair<Host, Long> pair = clientIdMapper.remove(not.getOpId());
 		
-		sendMessage(new ResponseMessage(pair.getRight(), new byte[0]), pair.getLeft());
+	// 	sendMessage(new ResponseMessage(pair.getRight(), new byte[0]), pair.getLeft());
 		
-		this.updateOperationCountAndPrintHash();
-	}
+	// 	this.updateOperationCountAndPrintHash();
+	// }
 
-	private void uponUpdateValueNotification(UpdateValueNotification not, short sourceProto) {
-		logger.debug("Updating key due to a remote update.");
-		data.put(new String(not.getKey(),0,not.getKey().length), not.getValue());
+	// private void uponUpdateValueNotification(UpdateValueNotification not, short sourceProto) {
+	// 	logger.debug("Updating key due to a remote update.");
+	// 	data.put(new String(not.getKey(),0,not.getKey().length), not.getValue());
 
-		this.updateOperationCountAndPrintHash();
-	}
+	// 	this.updateOperationCountAndPrintHash();
+	// }
 
 
 	private void updateOperationCountAndPrintHash() {
