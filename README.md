@@ -3,7 +3,7 @@
 ## Organisational details
 
 - **Same groups** as defined in phase 1 of the project.
-- **Deadline: 23:59:59 2024-11-29 (Sexta-feira)**
+- **Deadline: 23:59:59 2024-12-02 (Sexta-feira)**
 - Cluster access is provided for trialling your system.
 
 ## Project description
