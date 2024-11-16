@@ -1,7 +1,12 @@
-package protocols.agreement;
+package protocols.agreement.abd;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import protocols.agreement.abd.messages.ReadTag;
+import protocols.agreement.abd.messages.SendTag;
+import protocols.agreement.abd.requests.ReadRequest;
+import protocols.agreement.abd.requests.WriteRequest;
 import protocols.agreement.messages.BroadcastMessage;
 import protocols.agreement.notifications.DecidedNotification;
 import protocols.agreement.notifications.JoinedNotification;
@@ -12,12 +17,14 @@ import protocols.statemachine.notifications.ChannelReadyNotification;
 import pt.unl.fct.di.novasys.babel.core.GenericProtocol;
 import pt.unl.fct.di.novasys.babel.exceptions.HandlerRegistrationException;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
+import pt.unl.fct.di.novasys.channel.tcp.TCPChannel;
 import pt.unl.fct.di.novasys.network.data.Host;
 
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 
 /**
  * This is NOT a correct agreement protocol (it is actually a VERY wrong one)
@@ -34,30 +41,46 @@ public class ABD extends GenericProtocol {
     public final static short PROTOCOL_ID = 100;
     public final static String PROTOCOL_NAME = "ABD";
 
+    private final int channelID;
+
     private Host myself;
     private int joinedInstance;
     private List<Host> membership;
+    private Pair<Integer, UUID> tag;
 
     public ABD(Properties props) throws IOException, HandlerRegistrationException {
         super(PROTOCOL_NAME, PROTOCOL_ID);
         joinedInstance = -1; //-1 means we have not yet joined the system
         membership = null;
+        tag = Pair.of(0, null); // We haven't yet seen a message
 
-        /*--------------------- Register Timer Handlers ----------------------------- */
+        Properties channelProps = new Properties();
+        // Creating TCP channel
+        int dhtPort = Integer.parseInt(props.getProperty("port"));
+        channelProps.setProperty(TCPChannel.ADDRESS_KEY, props.getProperty("address"));
+        channelProps.setProperty(TCPChannel.PORT_KEY, String.valueOf(dhtPort));
+        this.channelID = createChannel(TCPChannel.NAME, channelProps);
 
-        /*--------------------- Register Request Handlers ----------------------------- */
+        /*------------------------------ Register Timer Handlers -------------------------------------------- */
+
+        /*------------------------------ Register Request Handlers ------------------------------------------ */
         registerRequestHandler(ProposeRequest.REQUEST_ID, this::uponProposeRequest);
         registerRequestHandler(AddReplicaRequest.REQUEST_ID, this::uponAddReplica);
         registerRequestHandler(RemoveReplicaRequest.REQUEST_ID, this::uponRemoveReplica);
+        registerRequestHandler(WriteRequest.REQUEST_ID, this::uponWriteRequest);
 
-        /*--------------------- Register Notification Handlers ----------------------------- */
+        /*------------------------------ Register Notification Handlers -------------------------------------- */
         subscribeNotification(ChannelReadyNotification.NOTIFICATION_ID, this::uponChannelCreated);
         subscribeNotification(JoinedNotification.NOTIFICATION_ID, this::uponJoinedNotification);
+
+
+        /*------------------------------ Register Message Message Serializers --------------------------------*/
+
     }
 
     @Override
-    public void init(Properties props) {
-        //Nothing to do here, we just wait for events from the application or agreement
+    public void init(Properties props) throws IOException {
+        //Nothing to do here, we just wait for events from the application or agreement (?)
     }
 
     //Upon receiving the channelId from the membership, register our own callbacks and serializers
@@ -69,14 +92,52 @@ public class ABD extends GenericProtocol {
         registerSharedChannel(cId);
         /*---------------------- Register Message Serializers ---------------------- */
         registerMessageSerializer(cId, BroadcastMessage.MSG_ID, BroadcastMessage.serializer);
+        registerMessageSerializer(cId, SendTag.MSG_ID, SendTag.serializer);
+        registerMessageSerializer(cId, ReadTag.MSG_ID, ReadTag.serializer);
         /*---------------------- Register Message Handlers -------------------------- */
         try {
-              registerMessageHandler(cId, BroadcastMessage.MSG_ID, this::uponBroadcastMessage, this::uponMsgFail);
+            registerMessageHandler(cId, BroadcastMessage.MSG_ID, this::uponBroadcastMessage, this::uponMsgFail);
+            registerMessageHandler(cId, SendTag.MSG_ID, this::uponSendTag, this::uponMsgFail);
+            registerMessageHandler(cId, ReadTag.MSG_ID, this::uponReadTag, this::uponMsgFail);
         } catch (HandlerRegistrationException e) {
             throw new AssertionError("Error registering message handler.", e);
         }
 
     }
+
+    /**
+     * When receiving a write request from the application.
+     * @param request from the application
+     * @param sourceProto id of the requester protocol
+     */
+    private void uponWriteRequest(WriteRequest request, short sourceProto) {
+
+    }
+
+    /**
+     * When receiving a tag requested earlier on {@link ABD#uponWriteRequest(WriteRequest, short)}
+     * @param msg with the tags
+     * @param host who send the message
+     * @param sourceProto id of the requester protocol
+     * @param channelId to send the message
+     *
+     * TODO - could optimize these messages in one handler ?
+     */
+    private void uponSendTag(SendTag msg, Host host, short sourceProto, int channelId) {
+
+    }
+
+    /**
+     * When receiving a read tag from a host who received a write request
+     * @param msg
+     * @param host
+     * @param sourceProto
+     * @param channelId
+     */
+    private void uponReadTag(ReadTag msg, Host host, short sourceProto, int channelId) {
+        SendTag sendTag = new SendTag(tag);
+    }
+
 
     private void uponBroadcastMessage(BroadcastMessage msg, Host host, short sourceProto, int channelId) {
         if(joinedInstance >= 0 ){

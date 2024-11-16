@@ -1,5 +1,8 @@
 package protocols.app;
 
+import protocols.agreement.abd.ABD;
+import protocols.agreement.abd.requests.ReadRequest;
+import protocols.agreement.abd.requests.WriteRequest;
 import pt.unl.fct.di.novasys.babel.core.GenericProtocol;
 import pt.unl.fct.di.novasys.babel.exceptions.HandlerRegistrationException;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
@@ -153,19 +156,19 @@ public class HashApp extends GenericProtocol {
 				System.exit(1);
 			}
 		} else {
-			// //ABD interaction
-			// if(msg.getOpType() == RequestMessage.READ) {
+			 //ABD interaction
+			 if(msg.getOpType() == RequestMessage.READ) {
 
-			// 	sendRequest(new ReadRequest(opUUID, msg.getKey().getBytes()), ABD.PROTOCOL_ID);
+			 	sendRequest(new ReadRequest(opUUID, msg.getKey().getBytes()), ABD.PROTOCOL_ID);
 
-			// } else if (msg.getOpType() == RequestMessage.WRITE) {
+			 } else if (msg.getOpType() == RequestMessage.WRITE) {
 
-			// 	sendRequest(new WriteRequest(opUUID, msg.getKey().getBytes(), msg.getData()), ABD.PROTOCOL_ID);
+			 	sendRequest(new WriteRequest(opUUID, msg.getKey().getBytes(), msg.getData()), ABD.PROTOCOL_ID);
 
-			// } else {
-			// 	System.err.println("Invalid client operation");
-			// 	System.exit(1);
-			// }
+			 } else {
+			 	System.err.println("Invalid client operation");
+			 	System.exit(1);
+			 }
 		}
 	}
 

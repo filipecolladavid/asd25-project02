@@ -5,10 +5,21 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="965938c1-85ed-4f34-b4a1-0ffd0fc0a8e3" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/AgreementFactory.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config.properties" beforeDir="false" afterPath="$PROJECT_DIR$/config.properties" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/abd/messages/BroadcastMessage.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/abd/messages/ReadTag.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/abd/messages/SendTag.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/abd/messages/WriteMessage.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/abd/notifications/DecidedNotification.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/abd/notifications/JoinedNotification.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/abd/requests/AddReplicaRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/abd/requests/ProposeRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/abd/requests/ReadRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/abd/requests/RemoveReplicaRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/abd/requests/WriteRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/Main.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/agreement/ABD.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/ABD.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/agreement/ABD.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/agreement/abd/ABD.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/app/HashApp.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/app/HashApp.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -39,6 +50,7 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "git-widget-placeholder": "abd",
     "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "/Users/filipecolladavid/FCT_NOVA/ASD/ASD_PROJECT_2/asd25-project02/src/asd-project2-base/src/main/java/protocols/agreement/abd",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -48,6 +60,9 @@
   }
 }]]></component>
   <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src/main/java/protocols/agreement/abd" />
+    </key>
     <key name="CopyClassDialog.RECENTS_KEY">
       <recent name="protocols.agreement" />
     </key>
@@ -68,7 +83,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1731758600247</updated>
-      <workItem from="1731758602060" duration="539000" />
+      <workItem from="1731758602060" duration="7081000" />
     </task>
     <servers />
   </component>
