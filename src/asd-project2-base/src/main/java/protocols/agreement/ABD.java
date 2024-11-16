@@ -32,7 +32,7 @@ public class ABD extends GenericProtocol {
 
     //Protocol information, to register in babel
     public final static short PROTOCOL_ID = 100;
-    public final static String PROTOCOL_NAME = "EmptyAgreement";
+    public final static String PROTOCOL_NAME = "ABD";
 
     private Host myself;
     private int joinedInstance;
