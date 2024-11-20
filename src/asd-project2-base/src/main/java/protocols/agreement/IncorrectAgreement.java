@@ -18,6 +18,8 @@ import java.io.IOException;
 import java.util.*;
 
 /**
+ *
+ * MULTI PAXOS
  * This is NOT a correct agreement protocol (it is actually a VERY wrong one)
  * This is simply an example of things you can do, and can be used as a starting point.
  *
