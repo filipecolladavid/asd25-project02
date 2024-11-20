@@ -1,8 +1,8 @@
 package protocols.app;
 
-import protocols.agreement.abd.ABD;
-import protocols.agreement.abd.requests.ReadRequest;
-import protocols.agreement.abd.requests.WriteRequest;
+import protocols.abd.ABD;
+import protocols.abd.requests.ReadRequest;
+import protocols.abd.requests.WriteRequest;
 import pt.unl.fct.di.novasys.babel.core.GenericProtocol;
 import pt.unl.fct.di.novasys.babel.exceptions.HandlerRegistrationException;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;

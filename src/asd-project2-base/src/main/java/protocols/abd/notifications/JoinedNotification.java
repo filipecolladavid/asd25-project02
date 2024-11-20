@@ -1,4 +1,4 @@
-package protocols.agreement.abd.notifications;
+package protocols.abd.notifications;
 
 import pt.unl.fct.di.novasys.babel.generic.ProtoNotification;
 import pt.unl.fct.di.novasys.network.data.Host;

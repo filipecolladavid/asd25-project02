@@ -1,4 +1,4 @@
-package protocols.agreement.abd.messages;
+package protocols.abd.messages;
 
 import io.netty.buffer.ByteBuf;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;

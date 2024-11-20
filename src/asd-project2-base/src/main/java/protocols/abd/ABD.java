@@ -1,12 +1,11 @@
-package protocols.agreement.abd;
+package protocols.abd;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import protocols.agreement.abd.messages.ReadTag;
-import protocols.agreement.abd.messages.SendTag;
-import protocols.agreement.abd.requests.ReadRequest;
-import protocols.agreement.abd.requests.WriteRequest;
+import protocols.abd.messages.ReadTag;
+import protocols.abd.messages.SendTag;
+import protocols.abd.requests.WriteRequest;
 import protocols.agreement.messages.BroadcastMessage;
 import protocols.agreement.notifications.DecidedNotification;
 import protocols.agreement.notifications.JoinedNotification;
@@ -164,6 +163,7 @@ public class ABD extends GenericProtocol {
     }
     private void uponAddReplica(AddReplicaRequest request, short sourceProto) {
         logger.debug("Received " + request);
+
         //The AddReplicaRequest contains an "instance" field, which we ignore in this incorrect protocol.
         //You should probably take it into account while doing whatever you do here.
         membership.add(request.getReplica());

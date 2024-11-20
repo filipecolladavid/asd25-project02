@@ -1,4 +1,4 @@
-package protocols.agreement.abd.requests;
+package protocols.abd.requests;
 
 import org.apache.commons.codec.binary.Hex;
 import pt.unl.fct.di.novasys.babel.generic.ProtoRequest;

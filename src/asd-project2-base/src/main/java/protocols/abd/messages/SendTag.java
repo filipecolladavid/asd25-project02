@@ -1,11 +1,10 @@
-package protocols.agreement.abd.messages;
+package protocols.abd.messages;
 
 import io.netty.buffer.ByteBuf;
 import org.apache.commons.lang3.tuple.Pair;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
 import pt.unl.fct.di.novasys.network.ISerializer;
 
-import java.io.IOException;
 import java.util.UUID;
 
 public class SendTag extends ProtoMessage {

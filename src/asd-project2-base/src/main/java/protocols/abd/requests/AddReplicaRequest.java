@@ -1,16 +1,16 @@
-package protocols.agreement.abd.requests;
+package protocols.abd.requests;
 
 import pt.unl.fct.di.novasys.babel.generic.ProtoRequest;
 import pt.unl.fct.di.novasys.network.data.Host;
 
-public class RemoveReplicaRequest extends ProtoRequest {
+public class AddReplicaRequest extends ProtoRequest {
 
-    public static final short REQUEST_ID = 102;
+    public static final short REQUEST_ID = 103;
 
     private final int instance;
     private final Host replica;
 
-    public RemoveReplicaRequest(int instance, Host replica) {
+    public AddReplicaRequest(int instance, Host replica) {
         super(REQUEST_ID);
         this.instance = instance;
         this.replica = replica;
@@ -27,7 +27,7 @@ public class RemoveReplicaRequest extends ProtoRequest {
 
     @Override
     public String toString() {
-        return "RemoveReplicaRequest{" +
+        return "AddReplicaRequest{" +
                 "instance=" + instance +
                 ", replica=" + replica +
                 '}';

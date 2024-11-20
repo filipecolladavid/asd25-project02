@@ -1,4 +1,4 @@
-package protocols.agreement.abd.messages;
+package protocols.abd.messages;
 
 import io.netty.buffer.ByteBuf;
 import org.apache.commons.lang3.tuple.Pair;

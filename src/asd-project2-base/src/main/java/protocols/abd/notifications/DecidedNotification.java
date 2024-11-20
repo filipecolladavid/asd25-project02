@@ -1,4 +1,4 @@
-package protocols.agreement.abd.notifications;
+package protocols.abd.notifications;
 
 import org.apache.commons.codec.binary.Hex;
 import pt.unl.fct.di.novasys.babel.generic.ProtoNotification;
