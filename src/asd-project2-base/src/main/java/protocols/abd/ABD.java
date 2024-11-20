@@ -5,6 +5,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import protocols.abd.messages.ReadTag;
 import protocols.abd.messages.SendTag;
+import protocols.abd.requests.ReadRequest;
 import protocols.abd.requests.WriteRequest;
 import protocols.agreement.messages.BroadcastMessage;
 import protocols.agreement.notifications.DecidedNotification;
@@ -20,10 +21,7 @@ import pt.unl.fct.di.novasys.channel.tcp.TCPChannel;
 import pt.unl.fct.di.novasys.network.data.Host;
 
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Properties;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * This is NOT a correct agreement protocol (it is actually a VERY wrong one)
@@ -43,9 +41,14 @@ public class ABD extends GenericProtocol {
     private final int channelID;
 
     private Host myself;
+    // Current instance
     private int joinedInstance;
     private List<Host> membership;
     private Pair<Integer, UUID> tag;
+    private boolean pending;
+    private List<WriteRequest> writeRequestsQ;
+    private List<ReadRequest> readRequestsQ;
+    private HashMap<String, byte[]> state;
 
     public ABD(Properties props) throws IOException, HandlerRegistrationException {
         super(PROTOCOL_NAME, PROTOCOL_ID);
@@ -55,9 +58,9 @@ public class ABD extends GenericProtocol {
 
         Properties channelProps = new Properties();
         // Creating TCP channel
-        int dhtPort = Integer.parseInt(props.getProperty("port"));
+        int port = Integer.parseInt(props.getProperty("port"));
         channelProps.setProperty(TCPChannel.ADDRESS_KEY, props.getProperty("address"));
-        channelProps.setProperty(TCPChannel.PORT_KEY, String.valueOf(dhtPort));
+        channelProps.setProperty(TCPChannel.PORT_KEY, String.valueOf(port));
         this.channelID = createChannel(TCPChannel.NAME, channelProps);
 
         /*------------------------------ Register Timer Handlers -------------------------------------------- */
