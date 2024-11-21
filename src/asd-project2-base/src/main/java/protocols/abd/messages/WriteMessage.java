@@ -8,7 +8,7 @@ import pt.unl.fct.di.novasys.network.ISerializer;
 import java.util.UUID;
 
 public class WriteMessage extends ProtoMessage {
-    public final static short MSG_ID = 102;
+    public final static short MSG_ID = 103;
     private final Pair<Integer, UUID> tag;
     private final byte[] data;
 

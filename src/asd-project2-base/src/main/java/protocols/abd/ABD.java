@@ -3,17 +3,14 @@ package protocols.abd;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import protocols.abd.messages.AddReplicaMessage;
+import protocols.abd.messages.BroadcastMessage;
 import protocols.abd.messages.ReadTag;
 import protocols.abd.messages.SendTag;
-import protocols.abd.requests.ReadRequest;
-import protocols.abd.requests.WriteRequest;
-import protocols.agreement.messages.BroadcastMessage;
-import protocols.agreement.notifications.DecidedNotification;
-import protocols.agreement.notifications.JoinedNotification;
-import protocols.agreement.requests.AddReplicaRequest;
-import protocols.agreement.requests.ProposeRequest;
-import protocols.agreement.requests.RemoveReplicaRequest;
-import protocols.statemachine.notifications.ChannelReadyNotification;
+import protocols.abd.notifications.ChannelReadyNotification;
+import protocols.abd.notifications.DecidedNotification;
+import protocols.abd.notifications.JoinedNotification;
+import protocols.abd.requests.*;
 import pt.unl.fct.di.novasys.babel.core.GenericProtocol;
 import pt.unl.fct.di.novasys.babel.exceptions.HandlerRegistrationException;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
@@ -21,14 +18,13 @@ import pt.unl.fct.di.novasys.channel.tcp.TCPChannel;
 import pt.unl.fct.di.novasys.network.data.Host;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.*;
 
 /**
- * This is NOT a correct agreement protocol (it is actually a VERY wrong one)
- * This is simply an example of things you can do, and can be used as a starting point.
- *
- * You are free to change/delete ANYTHING in this class, including its fields.
- * Do not assume that any logic implemented here is correct, think for yourself!
+ * ABD agreement protocol.
+ * Based on the Sharing Memory Robustly in Message-Passing Systems (aka ABD) paper.
+ * @see <a href="https://www.cs.huji.ac.il/course/2004/dist/p124-attiya.pdf">Paper</a>
  */
 public class ABD extends GenericProtocol {
 
@@ -41,13 +37,17 @@ public class ABD extends GenericProtocol {
     private final int channelID;
 
     private Host myself;
-    // Current instance
+    // Current instance of the protocol (should we increment everytime we read/write)?
     private int joinedInstance;
+    // Current members in the membership
     private List<Host> membership;
     private Pair<Integer, UUID> tag;
     private boolean pending;
+    // Write Request Queue
     private List<WriteRequest> writeRequestsQ;
+    // Read Request Queue
     private List<ReadRequest> readRequestsQ;
+    // Local copy of the KV map
     private HashMap<String, byte[]> state;
 
     public ABD(Properties props) throws IOException, HandlerRegistrationException {
@@ -77,6 +77,28 @@ public class ABD extends GenericProtocol {
 
 
         /*------------------------------ Register Message Message Serializers --------------------------------*/
+
+
+        // Create AddReplica request to join the system
+        if(props.containsKey("contact")) {
+            AddReplicaMessage addReplica = new AddReplicaMessage(this.joinedInstance, myself);
+            String[] contactIP = props.getProperty("contact").split(":");
+            String ipAddr = contactIP[0];
+            int contactPort = Integer.parseInt(contactIP[1]);
+            Host contactHost = new Host(InetAddress.getByName(ipAddr), contactPort);
+            openConnection(contactHost);
+            sendMessage(addReplica, contactHost);
+        } else {
+            // I'm the first replica
+            this.membership = new ArrayList<>();
+            this.membership.add(this.myself);
+            joinedInstance++;
+        }
+        // Initialize requests lists
+        writeRequestsQ = new LinkedList<>();
+        readRequestsQ = new LinkedList<>();
+        state = new HashMap<>();
+
 
     }
 
@@ -122,8 +144,6 @@ public class ABD extends GenericProtocol {
      * @param host who send the message
      * @param sourceProto id of the requester protocol
      * @param channelId to send the message
-     *
-     * TODO - could optimize these messages in one handler ?
      */
     private void uponSendTag(SendTag msg, Host host, short sourceProto, int channelId) {
 
@@ -166,9 +186,7 @@ public class ABD extends GenericProtocol {
     }
     private void uponAddReplica(AddReplicaRequest request, short sourceProto) {
         logger.debug("Received " + request);
-
-        //The AddReplicaRequest contains an "instance" field, which we ignore in this incorrect protocol.
-        //You should probably take it into account while doing whatever you do here.
+        request.getInstance();
         membership.add(request.getReplica());
     }
     private void uponRemoveReplica(RemoveReplicaRequest request, short sourceProto) {
