@@ -20,7 +20,7 @@ while [ $i -lt $processes ]; do
     membership="${membership},localhost:$(($base_p2p_port + $i))"
     i=$(($i + 1))
 done
-
+echo ${membership}
 i=0
 while [ $i -lt $processes ]; do
   java -DlogFilename=logs/node$(($base_p2p_port + $i)) -cp target/asdProj2.jar Main -conf config.properties address=localhost p2p_port=$(($base_p2p_port + $i)) server_port=$(($base_server_port + $i)) initial_membership=$membership 2>&1 | sed "s/^/[$(($base_p2p_port + $i))] /" &

@@ -9,27 +9,27 @@ public class WriteRequest extends ProtoRequest {
     public static final short REQUEST_ID = 105;
 
     private final UUID opId;
-    private final byte[] key;
+    private final char[] key;
     private final byte[] data;
 
-    public WriteRequest(UUID opId, byte[] key, byte[] data) {
+    public WriteRequest(UUID opId, char[] key, byte[] data) {
         super(REQUEST_ID);
         this.opId = opId;
         this.key = key;
         this.data = data;
     }
 
-    public byte[] getOperation() { return data; }
+    public byte[] getData() { return data; }
 
     public UUID getOpId() { return opId; }
 
-    public byte[] getKey() { return key; }
+    public char[] getKey() { return key; }
 
     @Override
     public String toString() {
         return "WriteRequest{" +
-                ", opId=" + opId +
-                ", data=" + Hex.encodeHexString(data) +
+                "opId=" + opId +
+                "key=" + new String(key) +
                 '}';
     }
 }

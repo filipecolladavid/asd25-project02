@@ -66,7 +66,6 @@ public class Main {
 			babel.registerProtocol(agreement);
 		} else {
 			System.err.println("Loading ABD protocol stack");
-
 			abd = new ABD(props);
 			babel.registerProtocol(abd);
 		}
@@ -79,7 +78,7 @@ public class Main {
 			sm.init(props);
 			agreement.init(props);
 		} else {
-			// abd.init(props);
+			abd.init(props);
 		}
 
 		//Start babel and protocol threads

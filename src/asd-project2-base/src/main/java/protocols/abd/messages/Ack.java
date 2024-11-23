@@ -4,40 +4,31 @@ import io.netty.buffer.ByteBuf;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
 import pt.unl.fct.di.novasys.network.ISerializer;
 
-import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
 
-public class ReadTag extends ProtoMessage {
+public class Ack extends ProtoMessage {
+    public final static short MSG_ID = 105;
+    private final int opSeq;
+    private final char[] key;
 
-    public final static short MSG_ID = 101;
-    private int opSec;
-    private char[] key;
-
-    public ReadTag(int opSec, char[] key) {
+    public Ack(int opSeq, char[] key) {
         super(MSG_ID);
-        this.opSec = opSec;
+        this.opSeq = opSeq;
         this.key = key;
     }
 
-    public int getOpSec() {
-        return opSec;
+    public int getOpSeq() {
+        return opSeq;
     }
 
     public char[] getKey() {
         return key;
     }
 
-    @Override
-    public String toString() {
-        return "ReadTag={" +
-                "opSec="+opSec+
-                ", key="+ new String(key) +
-                "}";
-    }
-
-    public static ISerializer<ReadTag> serializer = new ISerializer<ReadTag>() {
+    public static ISerializer<Ack> serializer = new ISerializer<Ack>() {
         @Override
-        public void serialize(ReadTag msg, ByteBuf out) {
-            out.writeInt(msg.opSec);
+        public void serialize(Ack msg, ByteBuf out) {
+            out.writeInt(msg.opSeq);
             serializeCharArray(out, msg.getKey());
         }
 
@@ -49,10 +40,10 @@ public class ReadTag extends ProtoMessage {
         }
 
         @Override
-        public ReadTag deserialize(ByteBuf in) {
-            int opSec = in.readInt();
+        public Ack deserialize(ByteBuf in) {
+            int opSeq = in.readInt();
             char[] key = deserializeCharArray(in);
-            return new ReadTag(opSec, key);
+            return new Ack(opSeq, key);
         }
 
         private char[] deserializeCharArray(ByteBuf in) {

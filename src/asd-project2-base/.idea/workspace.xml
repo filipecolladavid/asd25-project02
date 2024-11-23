@@ -5,13 +5,27 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bbd271cc-03a1-46af-af09-82ee4c71629d" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/AddReplicaMessage.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/ChannelReadyNotification.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/ExecuteNotification.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/uiDesigner.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/Ack.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadTagReply.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/ReadCompleteNotification.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/UpdateValueNotification.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/WriteCompleteNotification.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.properties" beforeDir="false" afterPath="$PROJECT_DIR$/config.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/Main.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/ABD.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/ABD.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/AddReplicaMessage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/AddReplicaMessage.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadTag.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadTag.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/SendTag.java" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/WriteMessage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/WriteMessage.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/DecidedNotification.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/DecidedNotification.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/ExecuteNotification.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/ExecuteNotification.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/JoinedNotification.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/JoinedNotification.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/ReadRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/ReadRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/WriteRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/WriteRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/app/HashApp.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/app/HashApp.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/start-processes-local.sh" beforeDir="false" afterPath="$PROJECT_DIR$/start-processes-local.sh" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -36,9 +50,12 @@
   <component name="MacroExpansionManager">
     <option name="directoryName" value="v9p690i9" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 5
-}]]></component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="ProjectErrors" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5
+}</component>
   <component name="ProjectId" id="2p8QThIhwWXolR5F98jMN2VBceA" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -49,6 +66,7 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.go.formatter.settings.were.checked": "true",
     "RunOnceActivity.go.migrated.go.modules.settings": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "abd",
     "go.import.settings.migrated": "true",
     "kotlin-language-version-configured": "true",
@@ -59,11 +77,16 @@
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
     "org.rust.first.attach.projects": "true",
-    "settings.editor.selected.configurable": "preferences.lookFeel",
+    "settings.editor.selected.configurable": "preferences.keymap",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
   <component name="RecentsManager">
+    <key name="CreateClassDialog.RecentsKey">
+      <recent name="protocols.abd.messages" />
+      <recent name="protocols.abd.notifications" />
+      <recent name="protocols.abd" />
+    </key>
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/src/main/java/protocols/abd/notifications" />
     </key>
@@ -88,13 +111,30 @@
       <option name="presentableId" value="Default" />
       <updated>1732145231861</updated>
       <workItem from="1732145233260" duration="4769000" />
+      <workItem from="1732225134590" duration="10298000" />
+      <workItem from="1732357994549" duration="19637000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>

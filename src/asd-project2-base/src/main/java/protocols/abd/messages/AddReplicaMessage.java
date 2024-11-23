@@ -24,10 +24,10 @@ public class AddReplicaMessage extends ProtoMessage {
 
     @Override
     public String toString() {
-        return "ReadTag";
+        return "AddReplica: "+replica;
     }
 
-    public static ISerializer<AddReplicaMessage> serializer = new ISerializer<AddReplicaMessage>() {
+    public static ISerializer<AddReplicaMessage> serializer = new ISerializer<>() {
         @Override
         public void serialize(AddReplicaMessage msg, ByteBuf out) throws IOException {
             out.writeInt(msg.getInstance());

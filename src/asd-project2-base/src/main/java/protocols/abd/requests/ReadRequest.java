@@ -3,21 +3,22 @@ package protocols.abd.requests;
 import org.apache.commons.codec.binary.Hex;
 import pt.unl.fct.di.novasys.babel.generic.ProtoRequest;
 
+import java.util.Arrays;
 import java.util.UUID;
 
 public class ReadRequest extends ProtoRequest {
     public static final short REQUEST_ID = 104;
 
     private final UUID opId;
-    private final byte[] operation;
-    public ReadRequest(UUID opId, byte[] operation) {
+    private final char[] key;
+    public ReadRequest(UUID opId, char[] key) {
         super(REQUEST_ID);
         this.opId = opId;
-        this.operation = operation;
+        this.key = key;
     }
 
-    public byte[] getOperation() {
-        return operation;
+    public char[] getKey() {
+        return key;
     }
 
     public UUID getOpId() {
@@ -28,7 +29,7 @@ public class ReadRequest extends ProtoRequest {
     public String toString() {
         return "ReadRequest{" +
                 ", opId=" + opId +
-                ", operation=" + Hex.encodeHexString(operation) +
+                ", key=" + Arrays.toString(key) +
                 '}';
     }
 }

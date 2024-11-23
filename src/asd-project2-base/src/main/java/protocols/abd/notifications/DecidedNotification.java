@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public class DecidedNotification extends ProtoNotification {
 
-    public static final short NOTIFICATION_ID = 101;
+    public static final short NOTIFICATION_ID = 202;
 
     private final int instance;
     private final UUID opId;
