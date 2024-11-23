@@ -61,6 +61,7 @@ public class ABD extends GenericProtocol {
     private Pair<UUID, byte[]> pending;
     // Set containing the reply messages
     private HashSet<Pair<Integer, Host>> answersReadTag;
+    private HashSet<ReadReply> answersReadReply;
     // Set containing the ack messages
     private HashSet<Host> answersAck;
 
@@ -68,6 +69,7 @@ public class ABD extends GenericProtocol {
      * Processes need to wait for at least 3 nodes to join the system to effectively start to quorum
      * Let's put membership management on hold.
      * Assume that once init is called they all join the system and are ready to quorum
+     * Membership doesn't contain myself
      *
      * @param props
      * @throws IOException
@@ -95,6 +97,7 @@ public class ABD extends GenericProtocol {
         registerRequestHandler(AddReplicaRequest.REQUEST_ID, this::uponAddReplica);
         registerRequestHandler(RemoveReplicaRequest.REQUEST_ID, this::uponRemoveReplica);
         registerRequestHandler(WriteRequest.REQUEST_ID, this::uponWriteRequest);
+        registerRequestHandler(ReadRequest.REQUEST_ID, this::uponReadRequest);
 
         /*------------------------------ Register Notification Handlers -------------------------------------- */
         subscribeNotification(ChannelReadyNotification.NOTIFICATION_ID, this::uponChannelCreated);
@@ -106,6 +109,8 @@ public class ABD extends GenericProtocol {
         registerMessageSerializer(channelID, ReadTag.MSG_ID, ReadTag.serializer);
         registerMessageSerializer(channelID, WriteMessage.MSG_ID, WriteMessage.serializer);
         registerMessageSerializer(channelID, Ack.MSG_ID, Ack.serializer);
+        registerMessageSerializer(channelID, ReadMessage.MSG_ID, ReadMessage.serializer);
+        registerMessageSerializer(channelID, ReadReply.MSG_ID, ReadReply.serializer);
 
         /*------------------------------ Register Message Message Handlers ----------------------------------- */
         try {
@@ -114,6 +119,8 @@ public class ABD extends GenericProtocol {
             registerMessageHandler(channelID, ReadTag.MSG_ID, this::uponReadTag, this::uponMsgFail);
             registerMessageHandler(channelID, WriteMessage.MSG_ID, this::uponWriteMessage, this::uponMsgFail);
             registerMessageHandler(channelID, Ack.MSG_ID, this::uponAck, this::uponMsgFail);
+            registerMessageHandler(channelID, ReadMessage.MSG_ID, this::uponReadMessage, this::uponMsgFail);
+            registerMessageHandler(channelID, ReadReply.MSG_ID, this::uponReadReply, this::uponMsgFail);
         } catch (HandlerRegistrationException e) {
             throw new AssertionError("Error registering message handler.", e);
         }
@@ -156,7 +163,7 @@ public class ABD extends GenericProtocol {
     private void uponAddReplicaMessage(AddReplicaMessage msg, Host host, short sourceProto, int channelId) {
         logger.info("Received request to add {}", msg.getReplica());
         Host peer = msg.getReplica();
-        membership.add(peer); // Redundant right now
+        membership.add(peer);
         logger.info("Added peer {}", peer);
     }
 
@@ -197,7 +204,7 @@ public class ABD extends GenericProtocol {
         }
         pending = Pair.of(request.getOpId(), request.getData());
         joinedInstance++;
-        //TODO - Probably would be better to initalize in the constructor
+        // TODO - Probably should be initialized in the constructor
         answersReadTag = new HashSet<>();
         Pair<Integer, Host> p = Pair.of(joinedInstance, myself);
         answersReadTag.add(p);
@@ -208,6 +215,81 @@ public class ABD extends GenericProtocol {
         for (Host peer : membership) {
             openConnection(peer);
             sendMessage(readTag, peer);
+        }
+    }
+
+    public void uponReadRequest(ReadRequest request, short sourceProto) {
+        logger.info("Received {} from application", request);
+        joinedInstance++;
+        // TODO - Probably should be initialized in the constructor
+        answersReadReply = new HashSet<>();
+        ReadMessage rm = new ReadMessage(joinedInstance, request.getKey());
+        // Replace by best effort broadcast
+        for (Host peer : membership) {
+            openConnection(peer);
+            sendMessage(rm, peer);
+        }
+        ReadReply rp = new ReadReply(
+                joinedInstance,
+                request.getKey(),
+                tag.get(request.getKey()),
+                val.get(request.getKey())
+        );
+        answersReadReply.add(rp);
+    }
+
+    public void uponReadMessage(ReadMessage msg, Host host, short sourceProto, int channelId) {
+        logger.info("Received {} from {}", msg, host);
+        Pair<Integer, Host> tagSend = tag.get(msg.getKey());
+        byte[] valToSend = val.get(msg.getKey());
+        if(tagSend == null) {
+            tagSend = Pair.of(0, myself);
+        }
+
+        ReadReply rp = new ReadReply(
+                msg.getOpSeq(),
+                msg.getKey(),
+                tagSend,
+                valToSend
+        );
+        openConnection(host);
+        sendMessage(rp, host);
+    }
+
+    private int getMaxSQTag(HashSet<Pair<Integer, Host>> answers) {
+        int max = Integer.MIN_VALUE;
+        for (Pair<Integer, Host> pair : answers) {
+            if(pair.getKey() > max) {
+                max = pair.getLeft();
+            }
+        }
+        return max;
+    }
+
+    private ReadReply getMaxReply(HashSet<ReadReply> answers) {
+        return answers.stream()
+                .max(Comparator.comparing(reply -> reply.getTag().getLeft()))
+                .orElseThrow(() -> new IllegalArgumentException("Answers set cannot be empty"));
+    }
+
+    public void uponReadReply(ReadReply msg, Host host, short sourceProto, int channelId) {
+        logger.info("Received {} from {}", msg, host);
+        if(msg.getPeerOpID() == joinedInstance) {
+            answersReadReply.add(msg);
+            if(answersReadTag.size() >= (membership.size()+1)/2 + 1) {
+                ReadReply msgMax = getMaxReply(answersReadReply);
+                Pair<Integer, Host> newTag = msgMax.getTag();
+                UUID cur = pending.getLeft();
+                pending = Pair.of(cur, msgMax.getValue());
+                joinedInstance++;
+                answersReadTag.clear();
+                WriteMessage wm = new WriteMessage(joinedInstance, msgMax.getKey(), newTag, pending.getRight());
+                for(Host peer : membership) {
+                    openConnection(peer);
+                    sendMessage(wm, peer);
+                }
+
+            }
         }
     }
 
@@ -225,7 +307,6 @@ public class ABD extends GenericProtocol {
         char[] key = msg.getKey();
         Pair<Integer, Host> pair = tag.get(key);
         if (pair == null) {
-            // TODO - should I write ? probably no - it will be written later ?
             // 0 means nothing was written yet.
             pair = Pair.of(0, myself);
 
@@ -233,16 +314,6 @@ public class ABD extends GenericProtocol {
         ReadTagReply readTagReply = new ReadTagReply(pair, msg.getOpSec(), key);
         openConnection(host);
         sendMessage(readTagReply, host);
-    }
-
-    private int getMaxSQTag(HashSet<Pair<Integer, Host>> answers) {
-        int max = Integer.MIN_VALUE;
-        for (Pair<Integer, Host> pair : answers) {
-            if(pair.getKey() > max) {
-                max = pair.getLeft();
-            }
-        }
-        return max;
     }
 
     /**
@@ -258,7 +329,7 @@ public class ABD extends GenericProtocol {
         if (joinedInstance == msg.getPeerOpID()) {
             answersReadTag.add(msg.getTag());
             System.out.println(answersReadTag.size());
-            if (answersReadTag.size() > (membership.size()+1)/2 + 1) {
+            if (answersReadTag.size() >= (membership.size()+1)/2 + 1) {
                 System.out.println("WE HAVE QUORUM");
                 int new_tag = getMaxSQTag(answersReadTag);
                 joinedInstance++;
@@ -298,7 +369,7 @@ public class ABD extends GenericProtocol {
         logger.info("Received {} from {}", msg, host);
         if (msg.getOpSeq() == joinedInstance) {
             answersAck.add(host);
-            if (answersAck.size() > (membership.size()+1)/2 + 1) {
+            if (answersAck.size() >= (membership.size()+1)/2 + 1) {
                 answersAck.clear();
                 if (pending.getRight() == null) {
                     logger.info("Triggered Write Complete notification");

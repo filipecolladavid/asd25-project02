@@ -5,27 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bbd271cc-03a1-46af-af09-82ee4c71629d" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/uiDesigner.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/Ack.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadTagReply.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/ReadCompleteNotification.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/UpdateValueNotification.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/WriteCompleteNotification.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadMessage.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadReply.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config.properties" beforeDir="false" afterPath="$PROJECT_DIR$/config.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/Main.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/client.log" beforeDir="false" afterPath="$PROJECT_DIR$/client/client.log" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/ABD.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/ABD.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/AddReplicaMessage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/AddReplicaMessage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadTag.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadTag.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/SendTag.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/WriteMessage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/WriteMessage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/DecidedNotification.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/DecidedNotification.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/ExecuteNotification.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/ExecuteNotification.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/JoinedNotification.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/JoinedNotification.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/ReadRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/ReadRequest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/WriteRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/WriteRequest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/app/HashApp.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/app/HashApp.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/start-processes-local.sh" beforeDir="false" afterPath="$PROJECT_DIR$/start-processes-local.sh" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -83,9 +67,9 @@
 }]]></component>
   <component name="RecentsManager">
     <key name="CreateClassDialog.RecentsKey">
+      <recent name="protocols.abd" />
       <recent name="protocols.abd.messages" />
       <recent name="protocols.abd.notifications" />
-      <recent name="protocols.abd" />
     </key>
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/src/main/java/protocols/abd/notifications" />
@@ -112,7 +96,7 @@
       <updated>1732145231861</updated>
       <workItem from="1732145233260" duration="4769000" />
       <workItem from="1732225134590" duration="10298000" />
-      <workItem from="1732357994549" duration="19637000" />
+      <workItem from="1732357994549" duration="25686000" />
     </task>
     <servers />
   </component>
