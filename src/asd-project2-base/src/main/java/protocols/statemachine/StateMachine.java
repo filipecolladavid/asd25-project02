@@ -8,6 +8,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -50,6 +51,10 @@ public class StateMachine extends GenericProtocol {
 
     // Membership States
     private final Host self;
+    private final Map<Host, Long> lastHeartbeatTime;
+    private final int membershipUpdatePeriod;
+    private final int maxJoinRetries;
+    private int currentJoinRetries;
     private List<Host> membership;
     private Host currentLeader;
     private boolean isLeader;
@@ -75,6 +80,10 @@ public class StateMachine extends GenericProtocol {
         this.pendingOperations = new HashMap<>();
         this.decidedOperations = new HashMap<>();
 
+        this.lastHeartbeatTime = new HashMap<>();
+        this.membershipUpdatePeriod = Integer.parseInt(props.getProperty("membership_update_period", "1000"));
+        this.maxJoinRetries = Integer.parseInt(props.getProperty("max_join_retries", "3"));
+        this.currentJoinRetries = 0;
         this.isLeader = false;
         this.currentLeader = null;
         this.membership = new LinkedList<>();
@@ -180,9 +189,89 @@ public class StateMachine extends GenericProtocol {
         logger.debug("Received order request from {}", request);
     }
 
-    private void uponJoinMessage(RequestMessage msg, Host host, short sourceProto, int channelId) {
+    private void uponJoinMessage(JoinMessage msg, Host from, short sourceProto, int channelId) {
         logger.debug("Received join request from {}", msg);
+        switch (msg.getJoinType()) {
+            case REQUEST:
+                handleJoinRequest(msg, from);
+                break;
+            case RESPONSE:
+                handleJoinResponse(msg, from);
+                break;
+        }
     }
+
+    private void handleJoinRequest(JoinMessage msg, Host from) {
+        logger.debug("Handling join request from {}", from);
+        if (!this.isLeader) {
+            if (this.currentLeader != null) {
+                sendMessage(msg, this.currentLeader);
+            }
+        }
+
+        Map<String, byte[]> stateSnapshot = new HashMap<>(applicationState);
+        List<Host> members = new LinkedList<>(membership);
+
+        if (!membership.contains(from)) {
+            members.add(from);
+            lastHeartbeatTime.put(from, System.currentTimeMillis());
+
+            LeadershipMessage updateMsg = new LeadershipMessage(
+                    LeadershipMessage.Type.MEMBERSHIP_UPDATE,
+                    -1,
+                    self,
+                    membership.size());
+
+            for (Host host : members) {
+                if (host.equals(self)) {
+                    continue;
+                }
+                if (!host.equals(from)) {
+                    sendMessage(updateMsg, host);
+                }
+            }
+        }
+
+        JoinMessage response = new JoinMessage(
+                JoinMessage.JoinType.RESPONSE,
+                from,
+                members,
+                nextOperationInstance,
+                stateSnapshot);
+
+        sendMessage(response, from);
+    };
+
+    private void handleJoinResponse(JoinMessage msg, Host from) {
+        logger.debug("Handling join response from {}", from);
+
+        if (this.state != State.JOINING) {
+            logger.warn("Received join response while not in JOINING state");
+            return;
+        }
+
+        logger.debug("Received join response with {} members", msg.getCurrentMembers().size());
+
+        this.membership = new LinkedList<>(msg.getCurrentMembers());
+        this.applicationState = new HashMap<>(msg.getCurrentState());
+        this.nextOperationInstance = msg.getCurrentInstance();
+        this.lastExecutedInstance = msg.getCurrentInstance() - 1;
+
+        if (!membership.isEmpty()) {
+            currentLeader = membership.get(0);
+            isLeader = self.equals(currentLeader);
+        }
+
+        for (Host host : membership) {
+            lastHeartbeatTime.put(host, System.currentTimeMillis());
+        }
+
+        state = State.ACTIVE;
+
+        triggerNotification(new JoinedNotification(membership, nextOperationInstance));
+
+        cancelTimer(JoinTimer.TIMER_ID);
+    };
 
     private void uponForwardOperationMessage(RequestMessage msg, Host host, short sourceProto, int channelId) {
         logger.debug("Received forward operation request from {}", msg);
@@ -199,7 +288,23 @@ public class StateMachine extends GenericProtocol {
 
     /*--------------------------------- Timer Events ---------------------------------------- */
     private void uponJoinTimer(ProtoTimer protoTimer, long l) {
-        logger.debug("Join timer expired");
+        if (state == State.JOINING) {
+            return;
+        }
+
+        if (currentJoinRetries >= maxJoinRetries) {
+            logger.warn("Maximum number of join retries reached");
+            return;
+        }
+
+        if (!membership.isEmpty()) {
+            Host randomMember = membership.get(new Random().nextInt(membership.size()));
+            JoinMessage joinMessage = new JoinMessage(JoinMessage.JoinType.REQUEST, self);
+            sendMessage(joinMessage, randomMember);
+            currentJoinRetries++;
+
+            setupPeriodicTimer(new JoinTimer(), membershipUpdatePeriod, membershipUpdatePeriod);
+        }
     }
 
     private void uponLeadershipTimer(ProtoTimer protoTimer, long l) {

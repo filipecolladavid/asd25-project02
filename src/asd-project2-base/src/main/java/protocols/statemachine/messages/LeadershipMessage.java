@@ -14,6 +14,7 @@ public class LeadershipMessage extends ProtoMessage {
         PREPARE,
         PREPARE_OK,
         HEARTBEAT,
+        MEMBERSHIP_UPDATE,
     }
 
     private final Type type;
