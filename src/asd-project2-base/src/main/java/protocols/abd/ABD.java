@@ -69,9 +69,9 @@ public class ABD extends GenericProtocol {
      * Processes need to wait for at least 3 nodes to join the system to effectively start to quorum
      * Let's put membership management on hold.
      * Assume that once init is called they all join the system and are ready to quorum
-     * Membership doesn't contain myself
+     * Membership doesn't contain myself.
      *
-     * @param props
+     * @param props properties of the current replica
      * @throws IOException
      * @throws HandlerRegistrationException
      */
@@ -160,13 +160,6 @@ public class ABD extends GenericProtocol {
         this.joinedInstance = 0;
     }
 
-    private void uponAddReplicaMessage(AddReplicaMessage msg, Host host, short sourceProto, int channelId) {
-        logger.info("Received request to add {}", msg.getReplica());
-        Host peer = msg.getReplica();
-        membership.add(peer);
-        logger.info("Added peer {}", peer);
-    }
-
     //Upon receiving the channelId from the membership, register our own callbacks and serializers
     private void uponChannelCreated(ChannelReadyNotification notification, short sourceProto) {
 //        int cId = notification.getChannelId();
@@ -202,33 +195,184 @@ public class ABD extends GenericProtocol {
             logger.info("I'm going to ignore this request for now... sry");
             return;
         }
-        pending = Pair.of(request.getOpId(), request.getData());
-        joinedInstance++;
         // TODO - Probably should be initialized in the constructor
         answersReadTag = new HashSet<>();
-        Pair<Integer, Host> p = Pair.of(joinedInstance, myself);
-        answersReadTag.add(p);
         answersAck = new HashSet<>();
+
+        // Also stores the operation UUID for returning it later
+        pending = Pair.of(request.getOpId(), request.getData());
+        joinedInstance++;
+
+        // Create tag to broadcast
+        Pair<Integer, Host> tag = Pair.of(joinedInstance, myself);
+        answersReadTag.add(tag);
         ReadTag readTag = new ReadTag(joinedInstance, request.getKey());
 
-        // Replace by best effort broadcast
+        // TODO - Replace by best effort broadcast
         for (Host peer : membership) {
             openConnection(peer);
             sendMessage(readTag, peer);
         }
     }
 
+    /**
+     * When receiving a read tag from a host who received a write request.<br>
+     * If no tag for that key exists, sends dummy tag with 0 (it will never be chosen, tags >= 1).
+     *
+     * @param msg containing the key and the current operation sequence number
+     * @param host that sent the message
+     * @param sourceProto id of the sending protocol
+     * @param channelId used to send the message
+     */
+    private void uponReadTag(ReadTag msg, Host host, short sourceProto, int channelId) {
+        logger.info("Received {} from {}", msg, host);
+        char[] key = msg.getKey();
+        Pair<Integer, Host> pair = tag.get(key);
+        if (pair == null) {
+            // 0 means nothing was written yet.
+            pair = Pair.of(0, myself);
+
+        }
+        // Send our tag for the key requested
+        ReadTagReply readTagReply = new ReadTagReply(pair, msg.getOpSec(), key);
+        openConnection(host);
+        sendMessage(readTagReply, host);
+    }
+
+    /**
+     * Returns the max tag integer value from all the tags received.
+     *
+     * @param answers received from the quorum.
+     * @return the max of all tags
+     */
+    private int getMaxSQTag(HashSet<Pair<Integer, Host>> answers) {
+        int max = Integer.MIN_VALUE;
+        for (Pair<Integer, Host> pair : answers) {
+            if(pair.getKey() > max) {
+                max = pair.getLeft();
+            }
+        }
+        return max;
+    }
+
+    /**
+     * When receiving a tag requested earlier on {@link ABD#uponWriteRequest(WriteRequest, short)}.
+     *
+     * @param msg with the tags
+     * @param host who send the message
+     * @param sourceProto id of the requester protocol
+     * @param channelId to send the message
+     */
+    private void uponReadTagReply(ReadTagReply msg, Host host, short sourceProto, int channelId) {
+        logger.info("Received {} from {}", msg, host);
+        if (joinedInstance == msg.getPeerOpID()) {
+            answersReadTag.add(msg.getTag());
+            // We have enough answers for a quorum
+            if (answersReadTag.size() >= (membership.size()+1)/2 + 1) {
+                int new_tag = getMaxSQTag(answersReadTag);
+                joinedInstance++;
+                answersReadTag.clear();
+                WriteMessage wm = new WriteMessage(
+                        joinedInstance,
+                        msg.getKey(),
+                        Pair.of(new_tag+1, myself),
+                        pending.getRight()
+                );
+                for (Host peer : membership) {
+                    openConnection(peer);
+                    sendMessage(wm, peer);
+                }
+                // Write here - not sending to myself
+                tag.put(wm.getKey(), wm.getTag());
+                val.put(wm.getKey(), wm.getData());
+                answersAck.add(myself);
+                // pending is now null - still saves the UUID for replying to the application
+                pending = Pair.of(pending.getLeft(), null);
+            }
+        }
+    }
+
+    /**
+     * When receiving WriteMessage, which instructs the replica to write the new value and new tag.
+     *
+     * @param msg containing the key, value and tag of the message.
+     * @param host who send the message
+     * @param sourceProto id of the requester protocol
+     * @param channelId to send the message
+     */
+    private void uponWriteMessage(WriteMessage msg, Host host, short sourceProto, int channelId) {
+        logger.info("Received {} from {}", msg, host);
+        Pair<Integer, Host> pair = tag.get(msg.getKey());
+        if (pair == null || msg.getTag().getLeft() > pair.getLeft()) {
+            tag.put(msg.getKey(), msg.getTag());
+            val.put(msg.getKey(), msg.getData());
+        }
+        openConnection(host);
+        Ack ack = new Ack(msg.getOpSeq(), msg.getKey());
+        sendMessage(ack, host);
+    }
+
+    /**
+     * When receiving an ACK from an operation (Read/Write).
+     *
+     * @param msg ack
+     * @param host who send the message
+     * @param sourceProto id of the requester protocol
+     * @param channelId to send the message
+     */
+    private void uponAck(Ack msg, Host host, short sourceProto, int channelId) {
+        logger.info("Received {} from {}", msg, host);
+        if (msg.getOpSeq() == joinedInstance) {
+            answersAck.add(host);
+            if (answersAck.size() >= (membership.size()+1)/2 + 1) {
+                answersAck.clear();
+                // Check weather if the current operation is a Write or a read
+                if (pending.getRight() == null) {
+                    logger.info("Triggered Write Complete notification");
+                    triggerNotification(new WriteCompleteNotification(
+                            pending.getLeft(),
+                            msg.getKey(),
+                            val.get(msg.getKey()))
+                    );
+                } else {
+                    logger.info("Triggered Read Complete notification");
+                    System.out.println(pending.getLeft());
+                    System.out.println(pending.getRight());
+                    triggerNotification(new ReadCompleteNotification(
+                            msg.getKey(),
+                            pending.getRight(),
+                            pending.getLeft())
+                    );
+                }
+                // Reset pending
+                pending = null;
+            }
+        }
+    }
+
+    /**
+     * Received a ReadRequest from the application
+     *
+     * @param request sent by the application
+     * @param sourceProto id of the sending protocol
+     */
     public void uponReadRequest(ReadRequest request, short sourceProto) {
         logger.info("Received {} from application", request);
         joinedInstance++;
         // TODO - Probably should be initialized in the constructor
         answersReadReply = new HashSet<>();
         ReadMessage rm = new ReadMessage(joinedInstance, request.getKey());
-        // Replace by best effort broadcast
+
+        pending = Pair.of(request.getOpId(), null);
+
+        // TODO - Replace by best effort broadcast
         for (Host peer : membership) {
             openConnection(peer);
             sendMessage(rm, peer);
         }
+
+
+        // Add my read reply to the answers set -- won't send to myself
         ReadReply rp = new ReadReply(
                 joinedInstance,
                 request.getKey(),
@@ -238,6 +382,15 @@ public class ABD extends GenericProtocol {
         answersReadReply.add(rp);
     }
 
+    /**
+     * Upon receiving a read message from another replica.<br>
+     * Sends latest tag we have associated with the key requested.
+     *
+     * @param msg containing the key and the operation sequence number
+     * @param host - original sender of the messages
+     * @param sourceProto - of the protocol from which the message was sent
+     * @param channelId - used to send the message
+     */
     public void uponReadMessage(ReadMessage msg, Host host, short sourceProto, int channelId) {
         logger.info("Received {} from {}", msg, host);
         Pair<Integer, Host> tagSend = tag.get(msg.getKey());
@@ -256,22 +409,29 @@ public class ABD extends GenericProtocol {
         sendMessage(rp, host);
     }
 
-    private int getMaxSQTag(HashSet<Pair<Integer, Host>> answers) {
-        int max = Integer.MIN_VALUE;
-        for (Pair<Integer, Host> pair : answers) {
-            if(pair.getKey() > max) {
-                max = pair.getLeft();
-            }
-        }
-        return max;
-    }
-
+    /**
+     * Returns the ReadReply with the higher tag from all the ReadReply messages received from the quorum.
+     *
+     * @param answers received from the quorum
+     * @return the higher tag
+     */
     private ReadReply getMaxReply(HashSet<ReadReply> answers) {
         return answers.stream()
                 .max(Comparator.comparing(reply -> reply.getTag().getLeft()))
                 .orElseThrow(() -> new IllegalArgumentException("Answers set cannot be empty"));
     }
 
+
+    /**
+     * When receiving a ReadReply message.<br>
+     * Waits for a quorum until it.<br>
+     * Sends Message to Write the message.<br>
+     *
+     * @param msg containing the higher tags
+     * @param host - original sender of the messages
+     * @param sourceProto - of the protocol from which the message was sent
+     * @param channelId - used to send the message
+     */
     public void uponReadReply(ReadReply msg, Host host, short sourceProto, int channelId) {
         logger.info("Received {} from {}", msg, host);
         if(msg.getPeerOpID() == joinedInstance) {
@@ -279,11 +439,13 @@ public class ABD extends GenericProtocol {
             if(answersReadTag.size() >= (membership.size()+1)/2 + 1) {
                 ReadReply msgMax = getMaxReply(answersReadReply);
                 Pair<Integer, Host> newTag = msgMax.getTag();
+                // Update the current pending value being read
                 UUID cur = pending.getLeft();
                 pending = Pair.of(cur, msgMax.getValue());
                 joinedInstance++;
                 answersReadTag.clear();
                 WriteMessage wm = new WriteMessage(joinedInstance, msgMax.getKey(), newTag, pending.getRight());
+                // TODO - replace by reliable broadcast
                 for(Host peer : membership) {
                     openConnection(peer);
                     sendMessage(wm, peer);
@@ -293,104 +455,20 @@ public class ABD extends GenericProtocol {
         }
     }
 
-
     /**
-     * When receiving a read tag from a host who received a write request
+     * When receiving a AddReplicaMessage, a new replica is trying to join the system.
      *
-     * @param msg received
-     * @param host that sent the message
-     * @param sourceProto id of the sending protocol
-     * @param channelId used to send the message
+     * @param msg - sent by the replica joining
+     * @param host - original sender of the messages
+     * @param sourceProto - of the protocol from which the message was sent
+     * @param channelId - used to send the message
      */
-    private void uponReadTag(ReadTag msg, Host host, short sourceProto, int channelId) {
-        logger.info("Received {} from {}", msg, host);
-        char[] key = msg.getKey();
-        Pair<Integer, Host> pair = tag.get(key);
-        if (pair == null) {
-            // 0 means nothing was written yet.
-            pair = Pair.of(0, myself);
-
-        }
-        ReadTagReply readTagReply = new ReadTagReply(pair, msg.getOpSec(), key);
-        openConnection(host);
-        sendMessage(readTagReply, host);
+    private void uponAddReplicaMessage(AddReplicaMessage msg, Host host, short sourceProto, int channelId) {
+        logger.info("Received request to add {}", msg.getReplica());
+        Host peer = msg.getReplica();
+        membership.add(peer);
+        logger.info("Added peer {}", peer);
     }
-
-    /**
-     * When receiving a tag requested earlier on {@link ABD#uponWriteRequest(WriteRequest, short)}
-     *
-     * @param msg with the tags
-     * @param host who send the message
-     * @param sourceProto id of the requester protocol
-     * @param channelId to send the message
-     */
-    private void uponReadTagReply(ReadTagReply msg, Host host, short sourceProto, int channelId) {
-        logger.info("Received {} from {}", msg, host);
-        if (joinedInstance == msg.getPeerOpID()) {
-            answersReadTag.add(msg.getTag());
-            System.out.println(answersReadTag.size());
-            if (answersReadTag.size() >= (membership.size()+1)/2 + 1) {
-                System.out.println("WE HAVE QUORUM");
-                int new_tag = getMaxSQTag(answersReadTag);
-                joinedInstance++;
-                answersReadTag.clear();
-                WriteMessage wm = new WriteMessage(
-                        joinedInstance,
-                        msg.getKey(),
-                        Pair.of(new_tag+1, myself),
-                        pending.getRight()
-                );
-                for (Host peer : membership) {
-                    openConnection(peer);
-                    sendMessage(wm, peer);
-                }
-                // Write here - not sending to myself
-                tag.put(wm.getKey(), wm.getTag());
-                val.put(wm.getKey(), wm.getData());
-                answersAck.add(myself);
-                pending = Pair.of(pending.getLeft(), null);
-            }
-        }
-    }
-
-    private void uponWriteMessage(WriteMessage msg, Host host, short sourceProto, int channelId) {
-        logger.info("Received {} from {}", msg, host);
-        Pair<Integer, Host> pair = tag.get(msg.getKey());
-        if (pair == null || msg.getTag().getLeft() > pair.getLeft()) {
-            tag.put(msg.getKey(), msg.getTag());
-            val.put(msg.getKey(), msg.getData());
-        }
-        openConnection(host);
-        Ack ack = new Ack(msg.getOpSeq(), msg.getKey());
-        sendMessage(ack, host);
-    }
-
-    private void uponAck(Ack msg, Host host, short sourceProto, int channelId) {
-        logger.info("Received {} from {}", msg, host);
-        if (msg.getOpSeq() == joinedInstance) {
-            answersAck.add(host);
-            if (answersAck.size() >= (membership.size()+1)/2 + 1) {
-                answersAck.clear();
-                if (pending.getRight() == null) {
-                    logger.info("Triggered Write Complete notification");
-                    triggerNotification(new WriteCompleteNotification(
-                            pending.getLeft(),
-                            msg.getKey(),
-                            val.get(msg.getKey()))
-                    );
-                    pending = null;
-                } else {
-                    triggerNotification(new ReadCompleteNotification(
-                            msg.getKey(),
-                            pending.getRight(),
-                            pending.getLeft())
-                    );
-                }
-            }
-        }
-    }
-
-
 
     private void uponBroadcastMessage(BroadcastMessage msg, Host host, short sourceProto, int channelId) {
         if(joinedInstance >= 0 ){

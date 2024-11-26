@@ -28,8 +28,8 @@ public class ReadRequest extends ProtoRequest {
     @Override
     public String toString() {
         return "ReadRequest{" +
-                ", opId=" + opId +
-                ", key=" + Arrays.toString(key) +
+                "opId=" + opId +
+                ", key=" + new String(key) +
                 '}';
     }
 }
