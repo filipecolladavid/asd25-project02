@@ -1,0 +1,5 @@
+# Questions ABD
+How to deal with processes joining the system:
+    - How are requests made? As messages, how to quorum without majority ? Assume that at least 3 nodes join the system together ?
+
+How to order operations? Is it a requirement? 

@@ -65,6 +65,8 @@ public class ABD extends GenericProtocol {
     // Set containing the ack messages
     private HashSet<Host> answersAck;
 
+    private boolean inOperation;
+
     /**
      * Processes need to wait for at least 3 nodes to join the system to effectively start to quorum
      * Let's put membership management on hold.
@@ -82,7 +84,11 @@ public class ABD extends GenericProtocol {
         membership = new HashSet<>();
         tag = new HashMap<>();
         val = new HashMap<>();
+        answersReadReply = new HashSet<>();
+        answersReadTag = new HashSet<>();
+        answersAck = new HashSet<>();
         pending = null;
+        inOperation = false;
         myself = new Host(
                 InetAddress.getByName(props.getProperty("address")),
                 Integer.parseInt(props.getProperty("p2p_port"))
@@ -191,15 +197,13 @@ public class ABD extends GenericProtocol {
         logger.info("Received {} from application", request);
 
         // Using this as opSeq - currently considering only one write at a time.
-        if(pending != null) {
+        if(pending != null || inOperation) {
             logger.info("I'm going to ignore this request for now... sry");
             return;
         }
-        // TODO - Probably should be initialized in the constructor
-        answersReadTag = new HashSet<>();
-        answersAck = new HashSet<>();
 
         // Also stores the operation UUID for returning it later
+        inOperation = true;
         pending = Pair.of(request.getOpId(), request.getData());
         joinedInstance++;
 
@@ -226,6 +230,7 @@ public class ABD extends GenericProtocol {
      */
     private void uponReadTag(ReadTag msg, Host host, short sourceProto, int channelId) {
         logger.info("Received {} from {}", msg, host);
+        inOperation = true;
         char[] key = msg.getKey();
         Pair<Integer, Host> pair = tag.get(key);
         if (pair == null) {
@@ -268,7 +273,7 @@ public class ABD extends GenericProtocol {
         if (joinedInstance == msg.getPeerOpID()) {
             answersReadTag.add(msg.getTag());
             // We have enough answers for a quorum
-            if (answersReadTag.size() >= (membership.size()+1)/2 + 1) {
+            if (answersReadTag.size() >= (membership.size()+1)/2) {
                 int new_tag = getMaxSQTag(answersReadTag);
                 joinedInstance++;
                 answersReadTag.clear();
@@ -310,6 +315,7 @@ public class ABD extends GenericProtocol {
         openConnection(host);
         Ack ack = new Ack(msg.getOpSeq(), msg.getKey());
         sendMessage(ack, host);
+        inOperation=false;
     }
 
     /**
@@ -346,6 +352,7 @@ public class ABD extends GenericProtocol {
                 }
                 // Reset pending
                 pending = null;
+                inOperation = false;
             }
         }
     }
@@ -358,9 +365,12 @@ public class ABD extends GenericProtocol {
      */
     public void uponReadRequest(ReadRequest request, short sourceProto) {
         logger.info("Received {} from application", request);
+        if(inOperation) {
+            logger.info("I'm going to ignore this request for now... sry");
+            return;
+        }
         joinedInstance++;
         // TODO - Probably should be initialized in the constructor
-        answersReadReply = new HashSet<>();
         ReadMessage rm = new ReadMessage(joinedInstance, request.getKey());
 
         pending = Pair.of(request.getOpId(), null);
@@ -417,8 +427,8 @@ public class ABD extends GenericProtocol {
      */
     private ReadReply getMaxReply(HashSet<ReadReply> answers) {
         return answers.stream()
-                .max(Comparator.comparing(reply -> reply.getTag().getLeft()))
-                .orElseThrow(() -> new IllegalArgumentException("Answers set cannot be empty"));
+            .max(Comparator.comparing(reply -> reply.getTag() != null ? reply.getTag().getLeft() : 0))
+            .orElseThrow(() -> new IllegalArgumentException("Answers set cannot be empty"));
     }
 
 
@@ -436,22 +446,28 @@ public class ABD extends GenericProtocol {
         logger.info("Received {} from {}", msg, host);
         if(msg.getPeerOpID() == joinedInstance) {
             answersReadReply.add(msg);
-            if(answersReadTag.size() >= (membership.size()+1)/2 + 1) {
+            if(answersReadReply.size() >= (membership.size()+1)/2 + 1) {
                 ReadReply msgMax = getMaxReply(answersReadReply);
-                Pair<Integer, Host> newTag = msgMax.getTag();
-                // Update the current pending value being read
-                UUID cur = pending.getLeft();
-                pending = Pair.of(cur, msgMax.getValue());
-                joinedInstance++;
-                answersReadTag.clear();
-                WriteMessage wm = new WriteMessage(joinedInstance, msgMax.getKey(), newTag, pending.getRight());
-                // TODO - replace by reliable broadcast
-                for(Host peer : membership) {
-                    openConnection(peer);
-                    sendMessage(wm, peer);
-                }
+                if(msgMax.getTag() == null) {
+                    // TODO - Key not found, what to do ?
+                    logger.info("Key not found");
+                    
+                } else {
+                    Pair<Integer, Host> newTag = msgMax.getTag();
+                    // Update the current pending value being read
+                    UUID cur = pending.getLeft();
+                    pending = Pair.of(cur, msgMax.getValue());
+                    joinedInstance++;
+                    WriteMessage wm = new WriteMessage(joinedInstance, msgMax.getKey(), newTag, pending.getRight());
 
+                    // TODO - replace by reliable broadcast
+                    for(Host peer : membership) {
+                        openConnection(peer);
+                        sendMessage(wm, peer);
+                    }
+                }
             }
+            answersReadTag.clear();
         }
     }
 

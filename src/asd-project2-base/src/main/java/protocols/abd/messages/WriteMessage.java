@@ -58,8 +58,13 @@ public class WriteMessage extends ProtoMessage {
         }
 
         private void serializeByteArray(ByteBuf out, byte[] array) {
-            out.writeInt(array.length);
-            out.writeBytes(array);
+            if (array == null) {
+                out.writeBoolean(false);
+            } else {
+                out.writeBoolean(true);
+                out.writeInt(array.length);
+                out.writeBytes(array);
+            }
         }
 
         private void serializeCharArray(ByteBuf out, char[] array) {
@@ -81,6 +86,10 @@ public class WriteMessage extends ProtoMessage {
         }
 
         private byte[] deserializeByteArray(ByteBuf in) {
+            boolean isNotNull = in.readBoolean();
+            if (!isNotNull) {
+                return null;
+            }
             int length = in.readInt();
             byte[] tmp = new byte[length];
             in.readBytes(tmp);
