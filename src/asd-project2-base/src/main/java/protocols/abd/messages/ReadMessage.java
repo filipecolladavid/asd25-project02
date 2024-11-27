@@ -1,14 +1,10 @@
 package protocols.abd.messages;
 
 import io.netty.buffer.ByteBuf;
-import org.apache.commons.lang3.tuple.Pair;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
 import pt.unl.fct.di.novasys.network.ISerializer;
-import pt.unl.fct.di.novasys.network.data.Host;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.UUID;
 
 public class ReadMessage extends ProtoMessage {
     public final static short MSG_ID = 106;

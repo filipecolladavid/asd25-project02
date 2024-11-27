@@ -1,9 +1,8 @@
-import protocols.abd.ABD;
 import pt.unl.fct.di.novasys.babel.core.Babel;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-// import protocols.abd.ABD;
+import protocols.abd.ABD;
 import protocols.agreement.IncorrectAgreement;
 import protocols.app.HashApp;
 import protocols.app.HashApp.ReplicationStrategy;

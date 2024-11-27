@@ -1,3 +1,14 @@
-2024-11-26 12:19:16:175 0 sec: 0 operations; est completion in 0 second 
-2024-11-26 12:19:21:157 5 sec: 10 operations; 2 current ops/sec; est completion in 1 day 17 hours [READ AverageLatency(us)=3071,67] [UPDATE AverageLatency(us)=18720] 
-2024-11-26 12:19:26:154 10 sec: 10 operations; 0 current ops/sec; est completion in 3 days 11 hours   
+2024-11-27 01:40:12:701 0 sec: 0 operations; est completion in 0 second 
+2024-11-27 01:40:17:684 5 sec: 14 operations; 2.8 current ops/sec; est completion in 1 day 5 hours [READ AverageLatency(us)=988190.5] [UPDATE AverageLatency(us)=904448.92] 
+2024-11-27 01:40:22:684 10 sec: 29 operations; 3 current ops/sec; est completion in 1 day 4 hours  [UPDATE AverageLatency(us)=1000006] 
+2024-11-27 01:40:27:684 15 sec: 44 operations; 3 current ops/sec; est completion in 1 day 4 hours  [UPDATE AverageLatency(us)=999996.73] 
+2024-11-27 01:40:32:684 20 sec: 59 operations; 3 current ops/sec; est completion in 1 day 4 hours [READ AverageLatency(us)=1000644] [UPDATE AverageLatency(us)=1000076] 
+2024-11-27 01:40:37:684 25 sec: 72 operations; 2.6 current ops/sec; est completion in 1 day 4 hours [READ AverageLatency(us)=1000695] [UPDATE AverageLatency(us)=999985.09] 
+2024-11-27 01:40:42:684 30 sec: 87 operations; 3 current ops/sec; est completion in 1 day 4 hours [READ AverageLatency(us)=1666780.67] [UPDATE AverageLatency(us)=1000104.25] 
+2024-11-27 01:40:47:684 35 sec: 100 operations; 2.6 current ops/sec; est completion in 1 day 5 hours  [UPDATE AverageLatency(us)=1000107.23] 
+2024-11-27 01:40:52:684 40 sec: 114 operations; 2.8 current ops/sec; est completion in 1 day 5 hours [READ AverageLatency(us)=1000321] [UPDATE AverageLatency(us)=1250178.58] 
+2024-11-27 01:40:57:684 45 sec: 129 operations; 3 current ops/sec; est completion in 1 day 5 hours  [UPDATE AverageLatency(us)=1000115.6] 
+2024-11-27 01:41:02:684 50 sec: 142 operations; 2.6 current ops/sec; est completion in 1 day 5 hours [READ AverageLatency(us)=999958] [UPDATE AverageLatency(us)=1000194.25] 
+2024-11-27 01:41:07:684 55 sec: 152 operations; 2 current ops/sec; est completion in 1 day 6 hours [READ AverageLatency(us)=1000237.5] [UPDATE AverageLatency(us)=1000072.12] 
+2024-11-27 01:41:12:684 60 sec: 167 operations; 3 current ops/sec; est completion in 1 day 5 hours [READ AverageLatency(us)=2750650] [UPDATE AverageLatency(us)=1000095.82] 
+2024-11-27 01:41:17:684 65 sec: 182 operations; 3 current ops/sec; est completion in 1 day 5 hours [READ AverageLatency(us)=1000518] [UPDATE AverageLatency(us)=1000141.29] 

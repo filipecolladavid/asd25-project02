@@ -7,7 +7,6 @@ import pt.unl.fct.di.novasys.network.ISerializer;
 import pt.unl.fct.di.novasys.network.data.Host;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 public class ReadReply extends ProtoMessage {
     public final static short MSG_ID = 107;

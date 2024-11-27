@@ -7,8 +7,6 @@ import pt.unl.fct.di.novasys.network.ISerializer;
 import pt.unl.fct.di.novasys.network.data.Host;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.UUID;
 
 public class WriteMessage extends ProtoMessage {
     public final static short MSG_ID = 103;

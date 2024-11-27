@@ -2,7 +2,6 @@ package protocols.abd.notifications;
 
 import pt.unl.fct.di.novasys.babel.generic.ProtoNotification;
 
-import java.util.Arrays;
 import java.util.UUID;
 
 public class ReadCompleteNotification extends ProtoNotification {
