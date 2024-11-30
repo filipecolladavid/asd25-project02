@@ -1,9 +1,12 @@
-package protocols.agreement.requests;
+package protocols.agreement.requestsbp;
+
+import pt.unl.fct.di.novasys.babel.generic.ProtoRequest;
+import org.apache.commons.codec.binary.Hex;
 
 import java.util.UUID;
-import pt.unl.fct.di.novasys.babel.generic.ProtoRequest;
 
 public class ProposeRequest extends ProtoRequest {
+
     public static final short REQUEST_ID = 101;
 
     private final int instance;
@@ -31,11 +34,10 @@ public class ProposeRequest extends ProtoRequest {
 
     @Override
     public String toString() {
-        return "ProposedRequest{" +
+        return "ProposeRequest{" +
                 "instance=" + instance +
                 ", opId=" + opId +
-                ", operation=" + operation +
+                ", operation=" + Hex.encodeHexString(operation) +
                 '}';
     }
-
 }

@@ -1,11 +1,7 @@
 package protocols.statemachine.messages;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.UUID;
 
 import io.netty.buffer.ByteBuf;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
@@ -21,24 +17,28 @@ public class JoinMessage extends ProtoMessage {
         RESPONSE
     }
 
+    private final UUID opID;
     private final JoinType joinType;
     private final Host joiningNode;
-    private final List<Host> currentMembers;
     private final int currentInstance;
-    private final Map<String, byte[]> currentState;
+    private final byte[] operation;
 
-    public JoinMessage(JoinType joinType, Host joiningNode) {
-        this(joinType, joiningNode, null, 0, null);
-    }
-
-    public JoinMessage(JoinType joinType, Host joiningNode, List<Host> currentMembers, int currentInstance,
-            Map<String, byte[]> currentState) {
+    public JoinMessage(UUID opID, JoinType joinType, Host joiningNode, int currentInstance) {
         super(MSG_ID);
+        this.opID = opID;
         this.joinType = joinType;
         this.joiningNode = joiningNode;
-        this.currentMembers = currentMembers;
         this.currentInstance = currentInstance;
-        this.currentState = currentState;
+
+        this.operation = new byte[JoinType.REQUEST.ordinal()];
+    }
+
+    public UUID getOpID() {
+        return opID;
+    }
+
+    public byte[] getOperation() {
+        return operation;
     }
 
     public JoinType getJoinType() {
@@ -49,85 +49,62 @@ public class JoinMessage extends ProtoMessage {
         return joiningNode;
     }
 
-    public List<Host> getCurrentMembers() {
-        return currentMembers;
-    }
-
     public int getCurrentInstance() {
         return currentInstance;
-    }
-
-    public Map<String, byte[]> getCurrentState() {
-        return currentState;
     }
 
     public static ISerializer<JoinMessage> serializer = new ISerializer<>() {
         @Override
         public void serialize(JoinMessage joinMessage, ByteBuf out) throws IOException {
+            out.writeLong(joinMessage.opID.getMostSignificantBits());
+            out.writeLong(joinMessage.opID.getLeastSignificantBits());
+
             out.writeInt(joinMessage.joinType.ordinal());
-            Host.serializer.serialize(joinMessage.joiningNode, out);
 
-            if (joinMessage.joinType == JoinType.RESPONSE) {
-                out.writeInt(joinMessage.currentMembers.size());
+            byte[] addressBytes = joinMessage.joiningNode.getAddress().getAddress();
+            out.writeInt(addressBytes.length);
+            out.writeBytes(addressBytes);
+            out.writeInt(joinMessage.joiningNode.getPort());
 
-                for (Host host : joinMessage.currentMembers)
-                    Host.serializer.serialize(host, out);
+            out.writeInt(joinMessage.currentInstance);
 
-                out.writeInt(joinMessage.currentInstance);
-                out.writeInt(joinMessage.currentState.size());
-
-                for (Map.Entry<String, byte[]> entry : joinMessage.currentState.entrySet()) {
-                    byte[] keyBytes = entry.getKey().getBytes(StandardCharsets.UTF_8);
-                    out.writeInt(keyBytes.length);
-                    out.writeBytes(keyBytes);
-
-                    out.writeInt(entry.getValue().length);
-                    out.writeBytes(entry.getValue());
-                }
-            }
+            out.writeInt(joinMessage.operation.length);
+            out.writeBytes(joinMessage.operation);
         }
 
         @Override
         public JoinMessage deserialize(ByteBuf in) throws IOException {
-            JoinType joinType = JoinType.values()[in.readInt()];
-            Host joiningNode = Host.serializer.deserialize(in);
+            long mostSigBits = in.readLong();
+            long leastSigBits = in.readLong();
+            UUID opID = new UUID(mostSigBits, leastSigBits);
 
-            if (joinType == JoinType.REQUEST) {
-                return new JoinMessage(joinType, joiningNode);
-            }
+            int joinTypeOrdinal = in.readInt();
+            JoinType joinType = JoinType.values()[joinTypeOrdinal];
 
-            List<Host> members = new LinkedList<>();
-            int membersSize = in.readInt();
-
-            for (int i = 0; i < membersSize; i++)
-                members.add(Host.serializer.deserialize(in));
+            int addressLength = in.readInt();
+            byte[] addressBytes = new byte[addressLength];
+            in.readBytes(addressBytes);
+            java.net.InetAddress address = java.net.InetAddress.getByAddress(addressBytes);
+            int port = in.readInt();
+            Host joiningNode = new Host(address, port);
 
             int currentInstance = in.readInt();
-            Map<String, byte[]> currentState = new HashMap<>();
-            int currentStateSize = in.readInt();
-            for (int i = 0; i < currentStateSize; i++) {
-                byte[] keyBytes = new byte[in.readInt()];
-                in.readBytes(keyBytes);
-                String key = new String(keyBytes, StandardCharsets.UTF_8);
 
-                int valueSize = in.readInt();
-                byte[] value = new byte[valueSize];
-                in.readBytes(value);
-                currentState.put(key, value);
-            }
+            int operationLength = in.readInt();
+            byte[] operation = new byte[operationLength];
+            in.readBytes(operation);
 
-            return new JoinMessage(joinType, joiningNode, members, currentInstance, currentState);
+            return new JoinMessage(opID, joinType, joiningNode, currentInstance);
         }
     };
 
     @Override
     public String toString() {
         return "JoinMessage{" +
+                "opID=" + opID +
                 "joinType=" + joinType +
                 ", joiningNode=" + joiningNode +
-                ", currentMembers=" + currentMembers +
                 ", currentInstance=" + currentInstance +
-                ", currentState=" + currentState +
                 '}';
     }
 }

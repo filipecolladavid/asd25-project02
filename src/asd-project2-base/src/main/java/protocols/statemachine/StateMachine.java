@@ -4,30 +4,31 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Random;
+import java.util.UUID;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import protocols.agreement.Agreement;
 import protocols.agreement.notifications.DecidedNotification;
-import protocols.agreement.notifications.JoinedNotification;
-import protocols.app.messages.RequestMessage;
-import protocols.statemachine.messages.ForwardOperationMessage;
+import protocols.agreement.requests.ProposeRequest;
 import protocols.statemachine.messages.JoinMessage;
 import protocols.statemachine.messages.LeadershipMessage;
 import protocols.statemachine.messages.OperationMessage;
 import protocols.statemachine.notifications.ChannelReadyNotification;
+
 import protocols.statemachine.requests.OrderRequest;
-import protocols.statemachine.timers.JoinTimer;
-import protocols.statemachine.timers.LeadershipTimer;
 import pt.unl.fct.di.novasys.babel.core.GenericProtocol;
 import pt.unl.fct.di.novasys.babel.exceptions.HandlerRegistrationException;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
-import pt.unl.fct.di.novasys.babel.generic.ProtoTimer;
 import pt.unl.fct.di.novasys.channel.tcp.TCPChannel;
 import pt.unl.fct.di.novasys.channel.tcp.events.InConnectionDown;
 import pt.unl.fct.di.novasys.channel.tcp.events.InConnectionUp;
@@ -41,32 +42,16 @@ public class StateMachine extends GenericProtocol {
     public static final short PROTOCOL_ID = 200;
     private static final Logger logger = LogManager.getLogger(StateMachine.class);
 
-    // Current State
-    private enum State {
-        JOINING,
-        ACTIVE
-    }
-
-    private State state;
-
     // Membership States
     private final Host self;
-    private final Map<Host, Long> lastHeartbeatTime;
-    private final int membershipUpdatePeriod;
-    private final int maxJoinRetries;
-    private int currentJoinRetries;
     private List<Host> membership;
     private Host currentLeader;
     private boolean isLeader;
 
     // Operations States
     private int nextOperationInstance;
-    private int lastExecutedInstance;
-    private Map<Integer, OperationMessage> pendingOperations;
-    private Map<Integer, OperationMessage> decidedOperations;
-
-    // Application State
-    private Map<String, byte[]> applicationState;
+    private Map<UUID, OperationMessage> pendingOperations;
+    private HashSet<UUID> decidedOperations;
 
     // Network State
     private final int channelId;
@@ -75,20 +60,13 @@ public class StateMachine extends GenericProtocol {
         super(PROTOCOL_NAME, PROTOCOL_ID);
 
         this.nextOperationInstance = 0;
-        this.lastExecutedInstance = -1;
 
         this.pendingOperations = new HashMap<>();
-        this.decidedOperations = new HashMap<>();
+        this.decidedOperations = new HashSet<UUID>();
 
-        this.lastHeartbeatTime = new HashMap<>();
-        this.membershipUpdatePeriod = Integer.parseInt(props.getProperty("membership_update_period", "1000"));
-        this.maxJoinRetries = Integer.parseInt(props.getProperty("max_join_retries", "3"));
-        this.currentJoinRetries = 0;
         this.isLeader = false;
         this.currentLeader = null;
         this.membership = new LinkedList<>();
-
-        this.applicationState = new HashMap<>();
 
         String address = props.getProperty("address");
         String port = props.getProperty("p2p_port");
@@ -106,6 +84,8 @@ public class StateMachine extends GenericProtocol {
         channelProps.setProperty(TCPChannel.CONNECT_TIMEOUT_KEY, "1000");
         channelId = createChannel(TCPChannel.NAME, channelProps);
 
+        logger.info("Self:[{}] SMR Channel ID {}", self, channelId);
+
         /*-------------------- Register Channel Events ------------------------------- */
         registerChannelEventHandler(channelId, OutConnectionDown.EVENT_ID, this::uponOutConnectionDown);
         registerChannelEventHandler(channelId, OutConnectionFailed.EVENT_ID, this::uponOutConnectionFailed);
@@ -117,32 +97,32 @@ public class StateMachine extends GenericProtocol {
         registerRequestHandler(OrderRequest.REQUEST_ID, this::uponOrderRequest);
 
         /*--------------------- Register Notification Handlers ----------------------------- */
+        // subscribeNotification(JoinedNotification.NOTIFICATION_ID,
+        // this::uponJoinedNotification);
         subscribeNotification(DecidedNotification.NOTIFICATION_ID, this::uponDecidedNotification);
 
         /*--------------------- Register Message Serializers ----------------------------- */
         registerMessageSerializer(channelId, JoinMessage.MSG_ID, JoinMessage.serializer);
-        registerMessageSerializer(channelId, ForwardOperationMessage.MSG_ID, ForwardOperationMessage.serializer);
+        registerMessageSerializer(channelId, OperationMessage.MSG_ID, OperationMessage.serializer);
         registerMessageSerializer(channelId, LeadershipMessage.MSG_ID, LeadershipMessage.serializer);
 
         /*--------------------- Register Message Handlers ----------------------------- */
-        registerMessageHandler(channelId, JoinMessage.MSG_ID, null, this::uponJoinMessage);
-        registerMessageHandler(channelId, ForwardOperationMessage.MSG_ID, null, this::uponForwardOperationMessage);
-        registerMessageHandler(channelId, LeadershipMessage.MSG_ID, null, this::uponLeadershipMessage);
+        registerMessageHandler(channelId, OperationMessage.MSG_ID, this::uponForwardOperationMessage);
+        registerMessageHandler(channelId, LeadershipMessage.MSG_ID, this::uponLeadershipMessage);
 
         /*--------------------- Register Timeout Handlers ----------------------------- */
-        registerTimerHandler(JoinTimer.TIMER_ID, this::uponJoinTimer);
-        registerTimerHandler(LeadershipTimer.TIMER_ID, this::uponLeadershipTimer);
     }
 
     @Override
     public void init(Properties props) {
         triggerNotification(new ChannelReadyNotification(channelId, self));
 
-        String host = props.getProperty("initial_membership");
-        String[] hosts = host.split(",");
+        // String host = props.getProperty("initial_membership");
+        String leaderHost = "localhost:34000";
+        String[] leader = leaderHost.split(",");
         List<Host> initialMembership = new LinkedList<>();
 
-        for (String s : hosts) {
+        for (String s : leader) {
             String[] hostElements = s.split(":");
             Host h;
             try {
@@ -150,32 +130,36 @@ public class StateMachine extends GenericProtocol {
             } catch (UnknownHostException e) {
                 throw new AssertionError("Error parsing initial_membership", e);
             }
+            if (h.equals(self)) {
+                continue;
+            }
             initialMembership.add(h);
         }
 
-        if (initialMembership.contains(self)) {
-            state = State.ACTIVE;
-            logger.info("Starting in ACTIVE as I am part of initial membership");
+        if (!this.membership.contains(self)) {
+            initialMembership.add(self);
+        }
 
+        if (initialMembership.contains(self)) {
             membership = new LinkedList<>(initialMembership);
             membership.forEach(this::openConnection);
 
             if (membership.get(0).equals(self)) {
                 isLeader = true;
                 currentLeader = self;
-                logger.info("I am the leader");
             } else {
                 isLeader = false;
                 currentLeader = membership.get(0);
-                logger.info("I am not the leader");
-            }
 
-            triggerNotification(new JoinedNotification(membership, 0));
+                UUID opID = UUID.randomUUID();
+                OperationMessage joinOperationMessage = new OperationMessage(opID,
+                        OperationMessage.OperationType.JOIN_REQUEST, self, this.nextOperationInstance++);
+                this.pendingOperations.put(opID, joinOperationMessage);
+                sendMessage(joinOperationMessage, currentLeader);
+            }
         } else {
-            state = State.JOINING;
             isLeader = false;
             currentLeader = null;
-            logger.info("Starting in JOINING as I am not part of initial membership");
 
             if (!initialMembership.isEmpty()) {
                 Host contactNode = initialMembership.get(0);
@@ -186,150 +170,99 @@ public class StateMachine extends GenericProtocol {
 
     /*--------------------------------- Requests ---------------------------------------- */
     private void uponOrderRequest(OrderRequest request, short sourceProto) {
-        logger.debug("Received order request from {}", request);
     }
 
-    private void uponJoinMessage(JoinMessage msg, Host from, short sourceProto, int channelId) {
-        logger.debug("Received join request from {}", msg);
-        switch (msg.getJoinType()) {
-            case REQUEST:
-                handleJoinRequest(msg, from);
-                break;
-            case RESPONSE:
-                handleJoinResponse(msg, from);
-                break;
-        }
-    }
+    private void uponForwardOperationMessage(OperationMessage msg, Host host, short sourceProto, int channelId) {
+        if (!this.pendingOperations.containsKey(msg.getOperationId())) {
+            this.pendingOperations.put(msg.getOperationId(), msg);
 
-    private void handleJoinRequest(JoinMessage msg, Host from) {
-        logger.debug("Handling join request from {}", from);
-        if (!this.isLeader) {
-            if (this.currentLeader != null) {
-                sendMessage(msg, this.currentLeader);
+            if (this.isLeader) {
+                this.membership.forEach(replica -> {
+                    if (!replica.equals(self) && !replica.equals(host)) {
+                        sendMessage(msg, replica);
+                    }
+                });
+
+                ProposeRequest newProposeRequest = new ProposeRequest(
+                        this.nextOperationInstance++,
+                        msg.getOperationId(),
+                        msg.getOperationPayload());
+                sendRequest(newProposeRequest, Agreement.PROTOCOL_ID);
             }
         }
-
-        Map<String, byte[]> stateSnapshot = new HashMap<>(applicationState);
-        List<Host> members = new LinkedList<>(membership);
-
-        if (!membership.contains(from)) {
-            members.add(from);
-            lastHeartbeatTime.put(from, System.currentTimeMillis());
-
-            LeadershipMessage updateMsg = new LeadershipMessage(
-                    LeadershipMessage.Type.MEMBERSHIP_UPDATE,
-                    -1,
-                    self,
-                    membership.size());
-
-            for (Host host : members) {
-                if (host.equals(self)) {
-                    continue;
-                }
-                if (!host.equals(from)) {
-                    sendMessage(updateMsg, host);
-                }
-            }
-        }
-
-        JoinMessage response = new JoinMessage(
-                JoinMessage.JoinType.RESPONSE,
-                from,
-                members,
-                nextOperationInstance,
-                stateSnapshot);
-
-        sendMessage(response, from);
-    };
-
-    private void handleJoinResponse(JoinMessage msg, Host from) {
-        logger.debug("Handling join response from {}", from);
-
-        if (this.state != State.JOINING) {
-            logger.warn("Received join response while not in JOINING state");
-            return;
-        }
-
-        logger.debug("Received join response with {} members", msg.getCurrentMembers().size());
-
-        this.membership = new LinkedList<>(msg.getCurrentMembers());
-        this.applicationState = new HashMap<>(msg.getCurrentState());
-        this.nextOperationInstance = msg.getCurrentInstance();
-        this.lastExecutedInstance = msg.getCurrentInstance() - 1;
-
-        if (!membership.isEmpty()) {
-            currentLeader = membership.get(0);
-            isLeader = self.equals(currentLeader);
-        }
-
-        for (Host host : membership) {
-            lastHeartbeatTime.put(host, System.currentTimeMillis());
-        }
-
-        state = State.ACTIVE;
-
-        triggerNotification(new JoinedNotification(membership, nextOperationInstance));
-
-        cancelTimer(JoinTimer.TIMER_ID);
-    };
-
-    private void uponForwardOperationMessage(RequestMessage msg, Host host, short sourceProto, int channelId) {
-        logger.debug("Received forward operation request from {}", msg);
     }
 
-    private void uponLeadershipMessage(RequestMessage msg, Host host, short sourceProto, int channelId) {
-        logger.debug("Received leadership request from {}", msg);
+    private void uponLeadershipMessage(LeadershipMessage msg, Host host, short sourceProto, int channelId) {
+        // logger.info("Received leadership request from {}", msg);
     }
 
     /*--------------------------------- Notifications ---------------------------------------- */
     private void uponDecidedNotification(DecidedNotification notification, short sourceProto) {
-        logger.debug("Received decided notification from {}", notification);
+        byte[] operation = notification.getOperationPayload();
+
+        try {
+            ByteBuf operationBuf = Unpooled.wrappedBuffer(operation);
+            OperationMessage operationToBeExecuted = OperationMessage.serializer.deserialize(operationBuf);
+
+            if (this.pendingOperations.containsKey(operationToBeExecuted.getOperationId())) {
+                if (notification.getDecisionType() == DecidedNotification.DecisionType.COMMIT) {
+                    if (operationToBeExecuted.getOperationType().equals(OperationMessage.OperationType.JOIN_REQUEST)) {
+                        updateMembership(notification.getMembership());
+                        // if (this.membership.contains(operationToBeExecuted.getOperationRequester()))
+                        // {
+                        // } else {
+                        // this.membership.add(operationToBeExecuted.getOperationRequester());
+                        // }
+                    }
+                }
+            }
+
+            logger.info("Self:[{}] Membership for host -> {}", self, this.membership);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void updateMembership(HashSet<Host> newMembership) {
+        LinkedHashSet<Host> orderedMembership = new LinkedHashSet<>();
+        if (currentLeader != null) {
+            orderedMembership.add(currentLeader);
+            newMembership.stream()
+                    .filter(h -> !h.equals(currentLeader))
+                    .forEach(orderedMembership::add);
+            this.membership = new LinkedList<>(orderedMembership);
+        }
+    }
+
+    public void updateJoinRequest(OperationMessage operationMessage) {
+        this.pendingOperations.remove(operationMessage.getOperationId());
+        this.decidedOperations.add(operationMessage.getOperationId());
     }
 
     /*--------------------------------- Timer Events ---------------------------------------- */
-    private void uponJoinTimer(ProtoTimer protoTimer, long l) {
-        if (state == State.JOINING) {
-            return;
-        }
-
-        if (currentJoinRetries >= maxJoinRetries) {
-            logger.warn("Maximum number of join retries reached");
-            return;
-        }
-
-        if (!membership.isEmpty()) {
-            Host randomMember = membership.get(new Random().nextInt(membership.size()));
-            JoinMessage joinMessage = new JoinMessage(JoinMessage.JoinType.REQUEST, self);
-            sendMessage(joinMessage, randomMember);
-            currentJoinRetries++;
-
-            setupPeriodicTimer(new JoinTimer(), membershipUpdatePeriod, membershipUpdatePeriod);
-        }
-    }
-
-    private void uponLeadershipTimer(ProtoTimer protoTimer, long l) {
-        logger.debug("Leadership timer expired");
-    }
 
     /*--------------------------------- TCP Channel Events ---------------------------------------- */
     private void uponOutConnectionUp(OutConnectionUp event, int channelId) {
-        logger.info("Connection to {} is up", event.getNode());
+        // logger.info("Connection to {} is up", event.getNode());
     }
 
     private void uponOutConnectionDown(OutConnectionDown event, int channelId) {
-        logger.debug("Connection to {} is down, cause {}", event.getNode(), event.getCause());
+        // logger.info("Connection to {} is down, cause {}", event.getNode(),
+        // event.getCause());
     }
 
     private void uponOutConnectionFailed(OutConnectionFailed<ProtoMessage> event, int channelId) {
-        logger.debug("Connection to {} failed, cause {}", event.getNode(), event.getCause());
+        // logger.info("Connection to {} failed, cause {}", event.getNode(),
+        // event.getCause());
     }
 
     private void uponInConnectionUp(InConnectionUp event, int channelId) {
-        logger.trace("Connection from {} is up", event.getNode());
+        // logger.info("Connection from {} is up", event.getNode());
     }
 
     private void uponInConnectionDown(InConnectionDown event, int channelId) {
-        logger.trace("Connection from {} is down, cause: {}", event.getNode(), event.getCause());
+        // logger.info("Connection from {} is down, cause: {}", event.getNode(),
+        // event.getCause());
     }
 
 }
