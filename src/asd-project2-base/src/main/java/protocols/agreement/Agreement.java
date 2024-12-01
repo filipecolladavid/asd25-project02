@@ -183,6 +183,7 @@ public class Agreement extends GenericProtocol {
 
     // Proposes States
     private HashMap<UUID, PaxosInstance> listOfProposes;
+    private HashMap<UUID, LearnPaxosMessage> decidedMessages;
 
     // Channel State
     private int channelId;
@@ -196,6 +197,7 @@ public class Agreement extends GenericProtocol {
 
         this.membership = new LinkedList<Host>();
         this.listOfProposes = new HashMap<UUID, PaxosInstance>();
+        this.decidedMessages = new HashMap<UUID, LearnPaxosMessage>();
 
         registerRequestHandler(ProposeRequest.REQUEST_ID, this::uponProposeRequest);
         registerRequestHandler(JoinRequest.REQUEST_ID, this::uponJoinRequest);
@@ -446,28 +448,37 @@ public class Agreement extends GenericProtocol {
                 Host joiningNode = value.getJoiningNode();
                 if (joiningNode != null && !this.membership.contains(joiningNode)) {
                     this.membership.add(joiningNode);
-                    logger.info("Self:[{}] Adding node {} to membership", self, this.membership);
+                    logger.info("Self:[{}] Adding node {} to membership", self, joiningNode);
                 }
             }
 
             notifyDecisionToStateMachine(msg.getOperationID());
             cleanProposes(msg.getOperationID());
-        }
 
-        if (this.isLeader) {
-            for (Host member : this.membership) {
-                if (!host.equals(self)) {
-                    DecidedMessage decidedMessage = new DecidedMessage(msg.getOperationID(), this.membership);
-                    this.openConnection(host);
-                    sendMessage(decidedMessage, member);
+            if (this.isLeader) {
+
+                if (this.decidedMessages.containsKey(msg.getOperationID())) {
+                    logger.info("Self:[{}] Already sent a decided message for {}", self, msg.getOperationID());
+                    return;
+                }
+                this.decidedMessages.put(msg.getOperationID(), msg);
+
+                for (Host member : this.membership) {
+                    if (!host.equals(self)) {
+                        DecidedMessage decidedMessage = new DecidedMessage(msg.getOperationID(),
+                                this.membership);
+                        // this.openConnection(host);
+                        sendMessage(decidedMessage, member);
+                        logger.info("Self:[{}] Sending Decided Message to {} with {}", self, member, this.membership);
+                    }
                 }
             }
-
         }
     }
 
     public void uponDecidedMessage(DecidedMessage msg, Host host, short sourceProto, int channelId) {
-        logger.info("Self:[{}] Received Decided Message from {}", self, host);
+        logger.info("Self:[{}] Received Decided Message from {} with {}", self, host, msg.getMembership());
+        this.membership = new LinkedList<>(msg.getMembership());
         notifyDecisionToStateMachine(msg.getOperationID());
     }
 
@@ -555,6 +566,7 @@ public class Agreement extends GenericProtocol {
         DecidedNotification decidedNotification = new DecidedNotification(operationId,
                 DecidedNotification.DecisionType.COMMIT, this.membership);
 
+        logger.info("Self:[{}] Notifying StateMachine of Decision for {}", self, operationId);
         triggerNotification(decidedNotification);
     }
 }
