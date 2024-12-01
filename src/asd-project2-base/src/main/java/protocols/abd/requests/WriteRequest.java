@@ -28,7 +28,7 @@ public class WriteRequest extends ProtoRequest {
     public String toString() {
         return "WriteRequest{" +
                 "opId=" + opId +
-                "key=" + new String(key) +
+                ", key=" + new String(key) +
                 '}';
     }
 }

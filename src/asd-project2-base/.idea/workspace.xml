@@ -5,43 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bbd271cc-03a1-46af-af09-82ee4c71629d" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/timer/StartOperationTimer.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/ABD.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/messages/Ack.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/messages/ReadMessage.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/messages/ReadReply.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/messages/ReadTag.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/messages/ReadTagReply.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/messages/WriteMessage.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/notifications/ChannelReadyNotification.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/notifications/DecidedNotification.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/notifications/ExecuteNotification.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/notifications/JoinedNotification.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/notifications/ReadCompleteNotification.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/notifications/UpdateValueNotification.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/notifications/WriteCompleteNotification.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/requests/AddReplicaRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/requests/ProposeRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/requests/ReadRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/requests/RemoveReplicaRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/requests/WriteRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/timer/StartOperationTimer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../../.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/client/client.log" beforeDir="false" afterPath="$PROJECT_DIR$/client/client.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/Main.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/ABD.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/ABD.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/Ack.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/Ack.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/AddReplicaMessage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/messages/AddReplicaMessage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/BroadcastMessage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd1/messages/BroadcastMessage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadMessage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadMessage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadReply.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadReply.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadTag.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadTag.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadTagReply.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadTagReply.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/WriteMessage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/WriteMessage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/ReadCompleteNotification.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/notifications/ReadCompleteNotification.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/ReadRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/ReadRequest.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/WriteRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/WriteRequest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/app/HashApp.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/app/HashApp.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -77,27 +45,27 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.go.formatter.settings.were.checked": "true",
-    "RunOnceActivity.go.migrated.go.modules.settings": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "abd",
-    "go.import.settings.migrated": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "/home/fcd/Work/FCT/ASD/asd25-project02/src/asd-project2-base/src/main/java/protocols/abd",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
-    "org.rust.first.attach.projects": "true",
-    "settings.editor.selected.configurable": "preferences.keymap",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;abd&quot;,
+    &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/fcd/Work/FCT/ASD/asd25-project02/src/asd-project2-base/src/main/java/protocols/abd&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon&quot;: &quot;&quot;,
+    &quot;org.rust.first.attach.projects&quot;: &quot;true&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.keymap&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CreateClassDialog.RecentsKey">
       <recent name="protocols.abd.timer" />
@@ -140,6 +108,8 @@
       <workItem from="1732571275269" duration="8847000" />
       <workItem from="1732640978410" duration="10653000" />
       <workItem from="1732657828103" duration="11186000" />
+      <workItem from="1733053138405" duration="5523000" />
+      <workItem from="1733067141940" duration="17692000" />
     </task>
     <servers />
   </component>
