@@ -1,6 +1,8 @@
 package protocols.agreement.notifications;
 
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.UUID;
 
 import pt.unl.fct.di.novasys.babel.generic.ProtoNotification;
 import pt.unl.fct.di.novasys.network.data.Host;
@@ -14,15 +16,21 @@ public class DecidedNotification extends ProtoNotification {
         ABORT
     }
 
+    private final UUID operationId;
     private final DecisionType decisionType;
     private final byte[] operationPayload;
-    private final HashSet<Host> membership;
+    private final LinkedList<Host> membership;
 
-    public DecidedNotification(DecisionType decisionType, byte[] operationPayload, HashSet<Host> membership) {
+    public DecidedNotification(UUID operationId, DecisionType decisionType, LinkedList<Host> membership) {
         super(NOTIFICATION_ID);
+        this.operationId = operationId;
         this.decisionType = decisionType;
-        this.operationPayload = operationPayload;
+        this.operationPayload = null;
         this.membership = membership;
+    }
+
+    public UUID getOperationId() {
+        return operationId;
     }
 
     public DecisionType getDecisionType() {
@@ -33,13 +41,14 @@ public class DecidedNotification extends ProtoNotification {
         return this.operationPayload;
     }
 
-    public HashSet<Host> getMembership() {
+    public LinkedList<Host> getMembership() {
         return this.membership;
     }
 
     @Override
     public String toString() {
         return "DecidedNotification{" +
+                "operationId=" + this.operationId +
                 ", operationPayload=" + this.operationPayload +
                 ", decisionType=" + this.decisionType +
                 ", membership=" + this.membership +

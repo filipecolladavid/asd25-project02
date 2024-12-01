@@ -1,8 +1,6 @@
 package protocols.statemachine.messages;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 import io.netty.buffer.ByteBuf;
@@ -11,55 +9,45 @@ import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
 import pt.unl.fct.di.novasys.network.ISerializer;
 import pt.unl.fct.di.novasys.network.data.Host;
 
-// Base Message that encapsulates an operation
 public class OperationMessage extends ProtoMessage {
     public static final short MSG_ID = 201;
 
-    public enum OperationType {
-        NEW_STATE,
-        JOIN_REQUEST,
-        ADD_REPLICA,
-        REMOVE_REPLICA,
-    }
-
     private final UUID operationId;
-    private final OperationType operationType;
-    private final Host operationRequester;
+    private final Host requester;
     private final int instanceNumber;
+    private final byte[] payload;
 
-    public OperationMessage(UUID operationId, OperationType operationType,
-            Host operationRequester, int instanceNumber) {
+    public OperationMessage(UUID operationId, Host requester, int instanceNumber, byte[] payload) {
         super(MSG_ID);
         this.operationId = operationId;
-        this.operationType = operationType;
-        this.operationRequester = operationRequester;
+        this.requester = requester;
         this.instanceNumber = instanceNumber;
+        this.payload = payload;
     }
 
     public UUID getOperationId() {
         return operationId;
     }
 
-    public OperationType getOperationType() {
-        return operationType;
-    }
-
-    public Host getOperationRequester() {
-        return operationRequester;
+    public Host getRequester() {
+        return requester;
     }
 
     public int getInstanceNumber() {
         return instanceNumber;
     }
 
+    public byte[] getPayload() {
+        return payload;
+    }
+
     public byte[] getOperationPayload() {
         ByteBuf buf = Unpooled.buffer();
         try {
             serializer.serialize(this, buf);
-            byte[] payload = new byte[buf.readableBytes()];
-            buf.readBytes(payload);
-
-            return payload;
+            byte[] operationPayload = new byte[buf.readableBytes()];
+            buf.readBytes(operationPayload);
+            return operationPayload;
         } catch (IOException e) {
             throw new RuntimeException("Failed to serialize operation", e);
         } finally {
@@ -67,54 +55,66 @@ public class OperationMessage extends ProtoMessage {
         }
     }
 
-    public static ISerializer<OperationMessage> serializer = new ISerializer<>() {
+    public static final ISerializer<OperationMessage> serializer = new ISerializer<>() {
         @Override
-        public void serialize(OperationMessage operationMessage, ByteBuf out) throws IOException {
-            out.writeLong(operationMessage.operationId.getMostSignificantBits());
-            out.writeLong(operationMessage.operationId.getLeastSignificantBits());
-            out.writeInt(operationMessage.operationType.ordinal());
-            byte[] addressBytes = operationMessage.operationRequester.getAddress().getAddress();
+        public void serialize(OperationMessage msg, ByteBuf out) throws IOException {
+            // Write operation ID
+            out.writeLong(msg.operationId.getMostSignificantBits());
+            out.writeLong(msg.operationId.getLeastSignificantBits());
+
+            // Write requester info
+            byte[] addressBytes = msg.requester.getAddress().getAddress();
             out.writeInt(addressBytes.length);
             out.writeBytes(addressBytes);
-            out.writeInt(operationMessage.operationRequester.getPort());
-            out.writeInt(operationMessage.instanceNumber);
+            out.writeInt(msg.requester.getPort());
+
+            // Write instance number
+            out.writeInt(msg.instanceNumber);
+
+            // Write payload
+            if (msg.payload != null) {
+                out.writeInt(msg.payload.length);
+                out.writeBytes(msg.payload);
+            } else {
+                out.writeInt(0);
+            }
         }
 
         @Override
         public OperationMessage deserialize(ByteBuf in) throws IOException {
-            // Add validation for minimum required bytes
-            if (in.readableBytes() < 24) { // 8 + 8 + 4 + 4 minimum
+            if (in.readableBytes() < 24) {
                 throw new IOException("Buffer too small - not enough data");
             }
 
-            long mostSignificantBits = in.readLong();
-            long leastSignificantBits = in.readLong();
-            UUID operationId = new UUID(mostSignificantBits, leastSignificantBits);
+            // Read operation ID
+            UUID operationId = new UUID(in.readLong(), in.readLong());
 
-            int typeOrdinal = in.readInt();
-            if (typeOrdinal < 0 || typeOrdinal >= OperationType.values().length) {
-                throw new IOException("Invalid operation type ordinal: " + typeOrdinal);
-            }
-            OperationType operationType = OperationType.values()[typeOrdinal];
-
+            // Read requester info
             int addressLength = in.readInt();
-            if (addressLength <= 0 || addressLength > 16) { // IPv4 or IPv6 address
+            if (addressLength <= 0 || addressLength > 16) {
                 throw new IOException("Invalid address length: " + addressLength);
             }
-
             byte[] addressBytes = new byte[addressLength];
             in.readBytes(addressBytes);
             java.net.InetAddress address = java.net.InetAddress.getByAddress(addressBytes);
-
             int port = in.readInt();
             if (port < 0 || port > 65535) {
                 throw new IOException("Invalid port number: " + port);
             }
+            Host requester = new Host(address, port);
 
-            Host operationRequester = new Host(address, port);
+            // Read instance number
             int instanceNumber = in.readInt();
 
-            return new OperationMessage(operationId, operationType, operationRequester, instanceNumber);
+            // Read payload
+            byte[] payload = null;
+            int payloadLength = in.readInt();
+            if (payloadLength > 0) {
+                payload = new byte[payloadLength];
+                in.readBytes(payload);
+            }
+
+            return new OperationMessage(operationId, requester, instanceNumber, payload);
         }
     };
 
@@ -122,9 +122,9 @@ public class OperationMessage extends ProtoMessage {
     public String toString() {
         return "OperationMessage{" +
                 "operationId=" + operationId +
-                ", operationType=" + operationType +
-                ", operationRequester=" + operationRequester +
+                ", requester=" + requester +
                 ", instanceNumber=" + instanceNumber +
+                ", payloadSize=" + (payload != null ? payload.length : 0) +
                 '}';
     }
 }

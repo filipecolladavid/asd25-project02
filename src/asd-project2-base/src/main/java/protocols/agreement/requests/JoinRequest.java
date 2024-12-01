@@ -2,27 +2,28 @@ package protocols.agreement.requests;
 
 import java.util.UUID;
 import pt.unl.fct.di.novasys.babel.generic.ProtoRequest;
+import pt.unl.fct.di.novasys.network.data.Host;
 
-public class ProposeRequest extends ProtoRequest {
-    public static final short REQUEST_ID = 101;
+public class JoinRequest extends ProtoRequest {
+    public static final short REQUEST_ID = 102;
 
     private final int instance;
     private final UUID operationId;
-    private final byte[] operation;
+    private final Host joiningNode;
 
-    public ProposeRequest(int instance, UUID operationId, byte[] operation) {
+    public JoinRequest(int instance, UUID operationId, Host joiningNode) {
         super(REQUEST_ID);
         this.instance = instance;
         this.operationId = operationId;
-        this.operation = operation;
+        this.joiningNode = joiningNode;
     }
 
     public int getInstance() {
         return instance;
     }
 
-    public byte[] getOperation() {
-        return operation;
+    public Host getJoiningNode() {
+        return joiningNode;
     }
 
     public UUID getOperationId() {
@@ -31,10 +32,10 @@ public class ProposeRequest extends ProtoRequest {
 
     @Override
     public String toString() {
-        return "ProposedRequest{" +
+        return "JoinRequest{" +
                 "instance=" + instance +
                 ", operationId=" + operationId +
-                ", operation=" + operation +
+                ", joiningNode=" + joiningNode +
                 '}';
     }
 
