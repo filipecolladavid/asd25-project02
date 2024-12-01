@@ -12,6 +12,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import protocols.agreement.messages.AcceptPaxosMessage;
+import protocols.agreement.messages.DecidedMessage;
 import protocols.agreement.messages.LearnPaxosMessage;
 import protocols.agreement.messages.NewNodeMessage;
 import protocols.agreement.messages.PreparePaxosMessage;
@@ -250,10 +251,12 @@ public class Agreement extends GenericProtocol {
                 paxosInstance.getBallot(),
                 request.getOperationId(), PreparePaxosMessage.OperationType.REGULAR);
         for (Host host : this.membership) {
-            this.openConnection(host);
-            sendMessage(
-                    preparePaxosMessage,
-                    host);
+            if (!host.equals(self)) {
+                this.openConnection(host);
+                sendMessage(
+                        preparePaxosMessage,
+                        host);
+            }
         }
     }
 
@@ -310,8 +313,10 @@ public class Agreement extends GenericProtocol {
 
         for (Host host : this.membership) {
             logger.info("Self:[{}] Sending Prepare Paxos Message to {}", self, host);
-            this.openConnection(host);
-            sendMessage(preparePaxosMessage, host);
+            if (!host.equals(self)) {
+                this.openConnection(host);
+                sendMessage(preparePaxosMessage, host);
+            }
         }
     }
 
@@ -341,16 +346,19 @@ public class Agreement extends GenericProtocol {
                         msg.getOperationID(),
                         PromisePaxosMessage.OperationType.JOIN);
 
-                this.openConnection(host);
-                sendMessage(promisePaxosMessage, host);
+                if (!host.equals(self)) {
+                    this.openConnection(host);
+                    sendMessage(promisePaxosMessage, host);
+                }
             } else {
                 PromisePaxosMessage promisePaxosMessage = new PromisePaxosMessage(paxosInstance.getId(),
                         paxosInstance.getBallot(),
                         msg.getOperationID(),
                         PromisePaxosMessage.OperationType.REGULAR);
-
-                this.openConnection(host);
-                sendMessage(promisePaxosMessage, host);
+                if (!host.equals(self)) {
+                    this.openConnection(host);
+                    sendMessage(promisePaxosMessage, host);
+                }
             }
         }
     }
@@ -376,7 +384,7 @@ public class Agreement extends GenericProtocol {
 
         paxosInstance.setPromise(host, true);
 
-        if (hasQuorum(paxosInstance.getPromises())) {
+        if (hasQuorum(paxosInstance.getPromises()) && this.isLeader) {
             logger.info("Self:[{}] Accepting promise ballot with {}", self, msg.getBallot());
 
             AcceptPaxosMessage acceptPaxosMessage = new AcceptPaxosMessage(paxosInstance.getId(),
@@ -384,8 +392,10 @@ public class Agreement extends GenericProtocol {
                     msg.getOperationID());
 
             for (Host member : this.membership) {
-                this.openConnection(member);
-                sendMessage(acceptPaxosMessage, member);
+                if (!member.equals(self)) {
+                    this.openConnection(member);
+                    sendMessage(acceptPaxosMessage, member);
+                }
             }
         }
 
@@ -403,19 +413,15 @@ public class Agreement extends GenericProtocol {
         if (msg.getBallot() >= paxosInstance.getBallot()) {
             logger.info("Self:[{}] Accepting accept ballot with {}", self, msg.getBallot());
             paxosInstance.setBallot(msg.getBallot());
-            paxosInstance.setAccept(host, true); // Accept from the sender
-            paxosInstance.setAccept(self, true); // Also accept yourself
+            paxosInstance.setAccept(self, true);
+            logger.info("Accepts in Accept => {}", paxosInstance.getAccepts());
 
-            if (hasQuorum(paxosInstance.getAccepts())) {
-                logger.info("Self:[{}] Accepted ballot with {}", self, msg.getBallot());
-                LearnPaxosMessage learnPaxosMessage = new LearnPaxosMessage(paxosInstance.getId(),
-                        paxosInstance.getBallot(),
-                        msg.getOperationID());
-                for (Host member : this.membership) {
-                    this.openConnection(member);
-                    sendMessage(learnPaxosMessage, member);
-                }
-            }
+            logger.info("Self:[{}] Accepted ballot with {}", self, msg.getBallot());
+            LearnPaxosMessage learnPaxosMessage = new LearnPaxosMessage(paxosInstance.getId(),
+                    paxosInstance.getBallot(),
+                    msg.getOperationID());
+            this.openConnection(this.currentLeader);
+            sendMessage(learnPaxosMessage, this.currentLeader);
         }
     }
 
@@ -427,21 +433,46 @@ public class Agreement extends GenericProtocol {
             return;
         }
 
-        logger.info("Self:[{}] Learned ballot with {}", self, msg.getBallot());
+        paxosInstance.setAccept(host, true);
 
-        ProposedValue value = paxosInstance.getProposedValue();
-        if (value != null && value.getType() == ProposedValue.OperationType.JOIN) {
-            Host joiningNode = value.getJoiningNode();
-            if (joiningNode != null && !this.membership.contains(joiningNode)) {
-                this.membership.add(joiningNode);
-                handleMembershipUpdate(msg.getOperationID());
-            }
-        }
+        logger.info("Accepts => {}", paxosInstance.getAccepts());
+        logger.info("Has Quorum ? => {}", hasQuorum(paxosInstance.getAccepts()));
 
         if (hasQuorum(paxosInstance.getAccepts())) {
+            logger.info("QUORUM!");
+
+            ProposedValue value = paxosInstance.getProposedValue();
+            if (value != null && value.getType() == ProposedValue.OperationType.JOIN) {
+                Host joiningNode = value.getJoiningNode();
+                if (joiningNode != null && !this.membership.contains(joiningNode)) {
+                    this.membership.add(joiningNode);
+                    logger.info("Self:[{}] Adding node {} to membership", self, this.membership);
+                }
+            }
+
+            notifyDecisionToStateMachine(msg.getOperationID());
             cleanProposes(msg.getOperationID());
         }
+
+        if (this.isLeader) {
+            for (Host member : this.membership) {
+                if (!host.equals(self)) {
+                    DecidedMessage decidedMessage = new DecidedMessage(msg.getOperationID(), this.membership);
+                    this.openConnection(host);
+                    sendMessage(decidedMessage, member);
+                }
+            }
+
+        }
     }
+
+    public void uponDecidedMessage(DecidedMessage msg, Host host, short sourceProto, int channelId) {
+        logger.info("Self:[{}] Received Decided Message from {}", self, host);
+        notifyDecisionToStateMachine(msg.getOperationID());
+    }
+
+    // Decided Message
+    // operationID, decisionType, membership
 
     public void uponMsgFail(ProtoMessage msg, Host host, short destProto, Throwable throwable, int channelId) {
         logger.error("Message {} to {} failed, reason: {}", msg, host, throwable);
@@ -483,12 +514,14 @@ public class Agreement extends GenericProtocol {
             registerMessageHandler(this.channelId, LearnPaxosMessage.MESSAGE_ID, this::uponLearnAcceptPaxosMessage,
                     this::uponMsgFail);
             registerMessageHandler(this.channelId, NewNodeMessage.MSG_ID, this::uponNewNodeMessage);
+            registerMessageHandler(this.channelId, DecidedMessage.MESSAGE_ID, this::uponDecidedMessage);
 
             registerMessageSerializer(this.channelId, PreparePaxosMessage.MESSAGE_ID, PreparePaxosMessage.serializer);
             registerMessageSerializer(this.channelId, PromisePaxosMessage.MESSAGE_ID, PromisePaxosMessage.serializer);
             registerMessageSerializer(this.channelId, AcceptPaxosMessage.MESSAGE_ID, AcceptPaxosMessage.serializer);
             registerMessageSerializer(this.channelId, LearnPaxosMessage.MESSAGE_ID, LearnPaxosMessage.serializer);
             registerMessageSerializer(this.channelId, NewNodeMessage.MSG_ID, NewNodeMessage.serializer);
+            registerMessageSerializer(this.channelId, DecidedMessage.MESSAGE_ID, DecidedMessage.serializer);
         } catch (HandlerRegistrationException e) {
             throw new AssertionError("Error registering message handler.", e);
         }
@@ -505,16 +538,20 @@ public class Agreement extends GenericProtocol {
     }
 
     public boolean hasQuorum(HashMap<Host, Boolean> promises) {
-        int positiveResponses = (int) promises.values().stream().filter(v -> v).count();
-        int size = membership.size();
-        return positiveResponses > size / 2;
+        logger.info("Promises => {}", promises.size());
+        logger.info("Membership => {}", membership.size());
+        return promises.size() > membership.size() / 2;
+        // int positiveResponses = (int) promises.values().stream().filter(v ->
+        // v).count();
+        // int size = membership.size();
+        // return positiveResponses > size / 2;
     }
 
     private void cleanProposes(UUID operationID) {
         this.listOfProposes.remove(operationID);
     }
 
-    private void handleMembershipUpdate(UUID operationId) {
+    private void notifyDecisionToStateMachine(UUID operationId) {
         DecidedNotification decidedNotification = new DecidedNotification(operationId,
                 DecidedNotification.DecisionType.COMMIT, this.membership);
 
