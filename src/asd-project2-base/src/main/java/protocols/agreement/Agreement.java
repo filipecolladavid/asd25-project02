@@ -28,6 +28,11 @@ import protocols.statemachine.notifications.ChannelReadyNotification;
 import pt.unl.fct.di.novasys.babel.core.GenericProtocol;
 import pt.unl.fct.di.novasys.babel.exceptions.HandlerRegistrationException;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
+import pt.unl.fct.di.novasys.channel.tcp.events.InConnectionDown;
+import pt.unl.fct.di.novasys.channel.tcp.events.InConnectionUp;
+import pt.unl.fct.di.novasys.channel.tcp.events.OutConnectionDown;
+import pt.unl.fct.di.novasys.channel.tcp.events.OutConnectionFailed;
+import pt.unl.fct.di.novasys.channel.tcp.events.OutConnectionUp;
 import pt.unl.fct.di.novasys.network.data.Host;
 
 class ProposedValue {
@@ -465,11 +470,11 @@ public class Agreement extends GenericProtocol {
 
                 for (Host member : this.membership) {
                     if (!host.equals(self)) {
+                        this.openConnection(member);
+                        logger.info("Self:[{}] Sending Decided Message to {} with {}", self, member, this.membership);
                         DecidedMessage decidedMessage = new DecidedMessage(msg.getOperationID(),
                                 this.membership);
-                        // this.openConnection(host);
                         sendMessage(decidedMessage, member);
-                        logger.info("Self:[{}] Sending Decided Message to {} with {}", self, member, this.membership);
                     }
                 }
             }
@@ -486,7 +491,7 @@ public class Agreement extends GenericProtocol {
     // operationID, decisionType, membership
 
     public void uponMsgFail(ProtoMessage msg, Host host, short destProto, Throwable throwable, int channelId) {
-        logger.error("Message {} to {} failed, reason: {}", msg, host, throwable);
+        logger.info("Message {} to {} failed, reason: {}", msg, host, throwable);
 
         // PaxosInstance instance = this.listOfProposes.get(msg.getPaxosInstanceID());
         //
@@ -516,6 +521,14 @@ public class Agreement extends GenericProtocol {
         registerSharedChannel(this.channelId);
 
         try {
+
+            // Channel Events
+            registerChannelEventHandler(this.channelId, OutConnectionDown.EVENT_ID, this::uponOutConnectionDown);
+            registerChannelEventHandler(this.channelId, OutConnectionFailed.EVENT_ID, this::uponOutConnectionFailed);
+            registerChannelEventHandler(this.channelId, OutConnectionUp.EVENT_ID, this::uponOutConnectionUp);
+            registerChannelEventHandler(this.channelId, InConnectionUp.EVENT_ID, this::uponInConnectionUp);
+            registerChannelEventHandler(this.channelId, InConnectionDown.EVENT_ID, this::uponInConnectionDown);
+
             registerMessageHandler(this.channelId, PreparePaxosMessage.MESSAGE_ID, this::uponPreparePaxosMessage,
                     this::uponMsgFail);
             registerMessageHandler(this.channelId, PromisePaxosMessage.MESSAGE_ID, this::uponPromisePaxosMessage,
@@ -534,6 +547,7 @@ public class Agreement extends GenericProtocol {
             registerMessageSerializer(this.channelId, NewNodeMessage.MSG_ID, NewNodeMessage.serializer);
             registerMessageSerializer(this.channelId, DecidedMessage.MESSAGE_ID, DecidedMessage.serializer);
         } catch (HandlerRegistrationException e) {
+            logger.info("Error on registering message handler", e);
             throw new AssertionError("Error registering message handler.", e);
         }
     }
@@ -549,13 +563,7 @@ public class Agreement extends GenericProtocol {
     }
 
     public boolean hasQuorum(HashMap<Host, Boolean> promises) {
-        logger.info("Promises => {}", promises.size());
-        logger.info("Membership => {}", membership.size());
         return promises.size() > membership.size() / 2;
-        // int positiveResponses = (int) promises.values().stream().filter(v ->
-        // v).count();
-        // int size = membership.size();
-        // return positiveResponses > size / 2;
     }
 
     private void cleanProposes(UUID operationID) {
@@ -568,5 +576,30 @@ public class Agreement extends GenericProtocol {
 
         logger.info("Self:[{}] Notifying StateMachine of Decision for {}", self, operationId);
         triggerNotification(decidedNotification);
+    }
+
+    /*
+     * --------------------------------- TCPChannel Events
+     * ----------------------------
+     */
+    private void uponOutConnectionUp(OutConnectionUp event, int channelId) {
+        logger.info("Self:[{}] Connection to {} is up", self, event.getNode());
+    }
+
+    private void uponOutConnectionDown(OutConnectionDown event, int channelId) {
+        logger.info("Self:[{}] Connection to {} is down, cause {}", self, event.getNode(), event.getCause());
+    }
+
+    private void uponOutConnectionFailed(OutConnectionFailed<ProtoMessage> event, int channelId) {
+        logger.info("Self:[{}] Connection to {} failed, cause {}", self, event.getNode(), event.getCause());
+    }
+
+    private void uponInConnectionUp(InConnectionUp event, int channelId) {
+        logger.info("Self:[{}] Connection from {} is up", self, event.getNode());
+
+    }
+
+    private void uponInConnectionDown(InConnectionDown event, int channelId) {
+        logger.info("Self:[{}] Connection from {} is down, cause {}", self, event.getNode(), event.getCause());
     }
 }
