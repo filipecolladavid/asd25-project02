@@ -4,8 +4,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import protocols.abd.messages.Ack;
-import protocols.abd.notifications.ChannelReadyNotification;
-import protocols.abd.notifications.JoinedNotification;
 import protocols.abd.requests.ReadRequest;
 import protocols.abd.requests.WriteRequest;
 import protocols.abd.timer.StartOperationTimer;
@@ -45,14 +43,12 @@ public class ABD extends GenericProtocol {
     //Protocol information, to register in babel
     public final static short PROTOCOL_ID = 100;
     public final static String PROTOCOL_NAME = "ABD";
-    private static final long RETRY_INTERVAL = 10;
+    private static final long RETRY_INTERVAL = 50;
 
     private int channelID;
 
     private Host myself;
     private Set<Host> membership;
-
-//    private Pair<UUID, byte[]> pending;
     private Map<String, byte[]> val;
     // Map of tags associated with each key
     private Map<String, Pair<Integer, Host>> tag;
@@ -418,7 +414,8 @@ public class ABD extends GenericProtocol {
                 // Write here - not sending to myself
                 logger.info("[{}] Updating values", myself);
                 tag.put(new String(wm.getKey()), wm.getTag());
-                val.put(new String(wm.getKey()), wm.getData());
+                val.put(new String(wm.getKey()), wm.getData() == null ? new byte[0] : wm.getData());
+
                 op.answersAck.add(myself);
                 // pending is now null - still saves the UUID for replying to the application
                 op.pending = Pair.of(op.pending.getLeft(), null);
