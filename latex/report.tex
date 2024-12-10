@@ -125,13 +125,29 @@ Universidade NOVA de Lisboa}
 \maketitle
 
 \begin{abstract}
-In the world of distributed systems having replication among machines is crucial to achieve better performance, scalability and fault tolerance of distributed systems, this replication is also known as State Machine Replication (SMR). There are multiple ways to solve SMR, however, each of these approaches has its own benefits and drawbacks. Identifying these tradeoffs is crucial for developing robust and efficient systems that are adequate to solve a specific problem.
+In the world of distributed systems, ensuring consistent replication among machines is crucial to achieve better performance, scalability and fault tolerance, this replication is also known as state machine replication (SMR). There are multiple ways to solve SMR, in this report will be discussing an ABD based SMR implementation and Multi-Paxos. The goal of the report is to explore each of these approaches, point out their benefits and drawbacks. Identifying these tradeoffs is crucial for the development of robust and efficient systems that are adequate to solve a specific problem.
 \end{abstract}
 
 \section{Introduction}
 \label{sec:intro}
-This report aims to describe the differences in performance and fault tolerance of each SMR. 
-Here is the main body of the report. Here is an example citation~\cite{gossip}.
+As demonstrated by FLP\cite{FLP} solution, achieving distributed consensus in a asynchronous environment with one faulty process is impossible, however, we can relax some properties of the consensus problem in order to have distributed consensus that works most of the times. In this report will be exploring different ways to relax the termination property of distributed consensus in order to have a practical consistent state replicated system across nodes using an ABD\cite{abd} based state machine protocol and Multi-Paxos\cite{multipaxos}.
+\par The state replication described in this report consists of a replicated key-value map and the membership of the system, the goal of this project is to ensure consistent replication of these states across each replica\footnote{A replica is a node participating in the quorum decisions of the system}, so that a client requesting an read/write operation will be able to ensure that his write requests are atomically replicated in the system and that his read request will always return the last value updated in the system.
+\par Multi-Paxos is a state machine replication protocol that admits and handles crash failures automatically, ABD by itself is just a quorum based system that guarantees atomic read-writes operations on a single registry, in order to implement state machine replication, some changes are needed.
+\par The implementation of these protocols will be done in Java using the Babel Framework\cite{babelfmwk}.
+
+\section{Related Work}
+\subsection{Babel Framework}
+\label{sec:BabelFramework}
+The Babel framework is a Java-based framework developed in the NOVA LINCS (Nova Laboratory for Computer Science and Informatics)\cite{novaLincs}, designed to simplify the development of distributed, fault-tolerant, high-performance protocols. It abstracts the low-level complexities such as the communication management timeouts, and concurrency, allowing developers to focus on core protocol logic. Babel uses an event-driver model where protocols are implement as independent event-based state machines that process timers, messages and requests, and emit notifications.
+\par In this report, the protocols were implemented using this framework, the nomeclature for the Pseudocode and explanations with be the one used in its respective paper.
+
+\subsection{Multi-Paxos}
+\label{sec:MultiPaxos}
+
+
+\subsection{ABD}
+\label{sec:ABD}
+
 
 \bibliography{biblio}
 \bibliographystyle{abbrv}

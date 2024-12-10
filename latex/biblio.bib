@@ -1,27 +1,57 @@
-@inproceedings{hyparview,
-  author       = "Leit{\~a}o, J. and Pereira, J. and Rodrigues, L.",
-  title        = "HyParView: a membership protocol for reliable gossip-based broadcast",
-  booktitle    = "Proceedings of the 37th Annual IEEE/IFIP International Conference on Dependable Systems and Networks",
-  year         = "2007",
-  pages        = "419--429",
-  address      = "Edinburgh, UK",
-  month        = jun
+@article{abd,
+author = {Attiya, Hagit and Bar-Noy, Amotz and Dolev, Danny},
+year = {1995},
+month = {01},
+pages = {124-142},
+title = {Sharing Memory Robustly in Message-Passing Systems.},
+volume = {42},
+journal = {J. ACM},
+doi = {10.1145/93385.93441}
 }
 
-@inproceedings{gossip,
-  author       = "Leit{\~a}o, J. and van Renesse, R. and Rodrigues, L.",
-  title        = "Balancing Gossip Exchanges in Networks with Firewalls",
-  booktitle    = "Proceedings of the 9th International Workshop on Peer-to-Peer Systems (IPTPS '10)",
-  year         = "2010",
-  address      = "San Jose, CA, U.S.A.",
-  month        = april
+@article{multipaxos,
+author = {Van Renesse, Robbert and Altinbuken, Deniz},
+title = {Paxos Made Moderately Complex},
+year = {2015},
+issue_date = {April 2015},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {47},
+number = {3},
+issn = {0360-0300},
+url = {https://doi.org/10.1145/2673577},
+doi = {10.1145/2673577},
+abstract = {This article explains the full reconfigurable multidecree Paxos (or multi-Paxos) protocol. Paxos is by no means a simple protocol, even though it is based on relatively simple invariants. We provide pseudocode and explain it guided by invariants. We initially avoid optimizations that complicate comprehension. Next we discuss liveness, list various optimizations that make the protocol practical, and present variants of the protocol.},
+journal = {ACM Comput. Surv.},
+month = feb,
+articleno = {42},
+numpages = {36},
+keywords = {Replicated state machines, consensus, voting}
 }
 
-@book{lerbook,
- author = {Guerraoui, Rachid and Rodrigues, Lu\'{\i}s},
- title = {Introduction to Reliable Distributed Programming},
- year = {2006},
- isbn = {3540288457},
- publisher = {Springer-Verlag New York, Inc.},
- address = {Secaucus, NJ, USA},
-} 
+@article{FLP,
+  title={Impossibility of distributed consensus with one faulty process},
+  author={Michael J. Fischer and Nancy A. Lynch and Mike Paterson},
+  journal={J. ACM},
+  year={1985},
+  volume={32},
+  pages={374-382},
+  url={https://api.semanticscholar.org/CorpusID:2458859}
+}
+
+@misc{babelfmwk,
+      title={Babel: A Framework for Developing Performant and Dependable Distributed Protocols}, 
+      author={Pedro Fouto and Pedro Ákos Costa and Nuno Preguiça and João Leitão},
+      year={2022},
+      eprint={2205.02106},
+      archivePrefix={arXiv},
+      primaryClass={cs.DC},
+      url={https://arxiv.org/abs/2205.02106}, 
+}
+
+@misc{novaLincs,
+  title = {NOVA LINCS},
+  note = {\url{https://nova-lincs.di.fct.unl.pt/} Accessed: 2024-12-10},
+  howpublished = {\url{https://nova-lincs.di.fct.unl.pt/}},
+  note = {Accessed: 2024-12-10}
+}
