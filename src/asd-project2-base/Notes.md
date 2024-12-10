@@ -9,3 +9,5 @@ How to order operations? Is it a requirement?
 Queue store operations received (Read/Write/Join request).<br>
 Operations are only executed on the timer.<br>
 Queue is only pop when receive confirmation.<br>
+
+
