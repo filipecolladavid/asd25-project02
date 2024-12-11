@@ -4,7 +4,9 @@ package protocols.abd;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import protocols.abd.messages.*;
+import protocols.abd.messages.membership.*;
+import protocols.abd.messages.writeread.*;
+import protocols.abd.operation.MembershipOperation;
 import protocols.abd.operation.Operation;
 import protocols.abd.operation.ReadWriteOperation;
 import protocols.abd.requests.ReadRequest;
@@ -57,8 +59,11 @@ public class ABD extends GenericProtocol {
     /**
      * Membership replicated
      */
+    private final static String MEMBERSHIP_KEY = "membership";
     // Equivalent to state in ABD
-    private Set<Host> membership;
+    private HashSet<Host> membership;
+    // Holds the replicas yet to join
+    private HashSet<Host> pendingMembership;
     // Equivalent to tag in ABD
     private Pair <Integer, Host> membershipTag;
     private Boolean ready;
@@ -111,6 +116,13 @@ public class ABD extends GenericProtocol {
 
         /*------------------------------ Register Message Message Serializers -------------------------------- */
         registerMessageSerializer(channelID, JoinMessage.MSG_ID, JoinMessage.serializer);
+        registerMessageSerializer(channelID, ReadTagMembership.MSG_ID, ReadTagMembership.serializer);
+        registerMessageSerializer(channelID, ReadTagReplyMembership.MSG_ID, ReadTagReplyMembership.serializer);
+        registerMessageSerializer(channelID, WriteMessageMembership.MSG_ID, WriteMessageMembership.serializer);
+        registerMessageSerializer(channelID, AckMembership.MSG_ID, AckMembership.serializer);
+        registerMessageSerializer(channelID, JoinReply.MSG_ID, JoinReply.serializer);
+        registerMessageSerializer(channelID, JoinnedMessage.MSG_ID, JoinnedMessage.serializer);
+
         registerMessageSerializer(channelID, ReadTagReply.MSG_ID, ReadTagReply.serializer);
         registerMessageSerializer(channelID, ReadTag.MSG_ID, ReadTag.serializer);
         registerMessageSerializer(channelID, WriteMessage.MSG_ID, WriteMessage.serializer);
@@ -122,6 +134,13 @@ public class ABD extends GenericProtocol {
         /*------------------------------ Register Message Message Handlers ----------------------------------- */
         try {
             registerMessageHandler(channelID, JoinMessage.MSG_ID, this::uponJoinMessage, this::uponMsgFail);
+            registerMessageHandler(channelID, ReadTagMembership.MSG_ID, this::uponReadTagMembership, this::uponMsgFail);
+            registerMessageHandler(channelID, ReadTagReplyMembership.MSG_ID, this::uponReadTagReplyMembership, this::uponMsgFail);
+            registerMessageHandler(channelID, WriteMessageMembership.MSG_ID, this::uponWriteMessageMembership, this::uponMsgFail);
+            registerMessageHandler(channelID, AckMembership.MSG_ID, this::uponAckMembership, this::uponMsgFail);
+            registerMessageHandler(channelID, JoinReply.MSG_ID, this::uponJoinReply, this::uponMsgFail);
+            registerMessageHandler(channelID, JoinnedMessage.MSG_ID, this::uponJoinnedMessage, this::uponMsgFail);
+
             registerMessageHandler(channelID, ReadTagReply.MSG_ID, this::uponReadTagReply, this::uponMsgFail);
             registerMessageHandler(channelID, ReadTag.MSG_ID, this::uponReadTag, this::uponMsgFail);
             registerMessageHandler(channelID, WriteMessage.MSG_ID, this::uponWriteMessage, this::uponMsgFail);
@@ -160,6 +179,7 @@ public class ABD extends GenericProtocol {
 
         // Would probably need some concurrent structure for this
         membership = new HashSet<>();
+        pendingMembership = new HashSet<>();
         tag = new ConcurrentHashMap<>();
         val = new ConcurrentHashMap<>();
         inProgressOperations = new ConcurrentHashMap<>();
@@ -176,6 +196,8 @@ public class ABD extends GenericProtocol {
                     membership.add(h);
                 }
             }
+            membershipTag = Pair.of(0, myself);
+            ready = true;
             logger.info("[{}] is Ready!", myself);
         } else {
             // Request to join
@@ -191,7 +213,7 @@ public class ABD extends GenericProtocol {
     }
 
     /**
-     * What happens if a message fails ?
+     * What happens if a message fails
      *
      * @param msg that failed
      * @param host to who was supposed to be sent
@@ -214,6 +236,8 @@ public class ABD extends GenericProtocol {
      */
     private void uponJoinMessage(JoinMessage msg, Host host, short sourceProto, int channelId) {
         logger.info("{} is trying to join the system", msg.getMyself());
+        Operation op = new MembershipOperation(new AddReplicaRequest(msg.getMyself()), opSeq.incrementAndGet());
+        pendingOperations.add(Pair.of(MEMBERSHIP_KEY+opSeq.get(), op));
     }
 
     /**
@@ -271,21 +295,20 @@ public class ABD extends GenericProtocol {
                 }
             }
         }
-
     }
 
     private void startOperation(Pair<Integer, Operation> request) {
 
         if(request.getRight().getRequest() instanceof WriteRequest) {
-            startWriteOperation(request.getRight(), request.getLeft());
+            startWriteOperation((ReadWriteOperation) request.getRight(), request.getLeft());
         }
 
         else if (request.getRight().getRequest() instanceof ReadRequest) {
-            startReadOperation( request.getRight(), request.getLeft());
+            startReadOperation( (ReadWriteOperation) request.getRight(), request.getLeft());
         }
 
         else if (request.getRight().getRequest() instanceof AddReplicaRequest) {
-
+            startMembershipOperation((MembershipOperation) request.getRight(), request.getLeft());
         }
 
         else if (request.getRight().getRequest() instanceof RemoveReplicaRequest) {
@@ -296,19 +319,43 @@ public class ABD extends GenericProtocol {
     }
 
     /**
+     * Starts the queued AddReplicaOperation
+     *
+     * @param op the Add Replica operation
+     * @param opNumSeq the seq number of the operation
+     */
+    private void startMembershipOperation(MembershipOperation op, int opNumSeq) {
+        logger.info("[{}]Starting Add Replica Operation", myself);
+        AddReplicaRequest request = (AddReplicaRequest) op.getRequest();
+        UUID uuid = UUID.randomUUID();
+        op.setPending(Pair.of(uuid, request.getReplica()));
+
+        // Updated tag to broadcast
+        membershipTag = Pair.of(opNumSeq, myself);
+        op.getAnswersReadTag().add(membershipTag);
+
+        ReadTagMembership rt = new ReadTagMembership(opNumSeq);
+
+        // TODO - Replace by reliable broadcast
+        for (Host peer: membership) {
+            openConnection(peer);
+            sendMessage(rt, peer);
+        }
+    }
+
+    /**
      * Starts the queued Write operation
      *
      * @param op the Write operation being executed
      */
-    private void startWriteOperation(Operation op, int opNumSeq) {
-        ReadWriteOperation opwr = (ReadWriteOperation) op;
+    private void startWriteOperation(ReadWriteOperation op, int opNumSeq) {
         // Also stores the operation UUID for returning it later
         WriteRequest request = (WriteRequest) op.getRequest();
-        opwr.setPending(Pair.of(request.getOpId(), request.getData()));
+        op.setPending(Pair.of(request.getOpId(), request.getData()));
 
         // Create tag to broadcast - and add to set
         Pair<Integer, Host> tag = Pair.of(opNumSeq, myself);
-        opwr.getAnswersReadTag().add(tag);
+        op.getAnswersReadTag().add(tag);
 
         ReadTag readTag = new ReadTag(opNumSeq, request.getKey());
 
@@ -319,11 +366,10 @@ public class ABD extends GenericProtocol {
         }
     }
 
-    private void startReadOperation(Operation op, int opNumSeq) {
-        ReadWriteOperation oprw = (ReadWriteOperation)op;
+    private void startReadOperation(ReadWriteOperation op, int opNumSeq) {
         ReadRequest request = (ReadRequest) op.getRequest();
         ReadMessage rm = new ReadMessage(opNumSeq, request.getKey());
-        oprw.setPending(Pair.of(request.getOpId(), null));
+        op.setPending(Pair.of(request.getOpId(), null));
 
         // TODO - Replace by reliable broadcast
         for (Host peer : membership) {
@@ -338,10 +384,24 @@ public class ABD extends GenericProtocol {
                 tag.get(new String(request.getKey())),
                 val.get(new String(request.getKey()))
         );
-        oprw.getAnswersReadReply().add(rp);
+        op.getAnswersReadReply().add(rp);
     }
 
+    /**
+     * When receiving a read tag for membership from a host who received a request to add a replica.<br>
+     *
+     * @param msg containing the operation seq
+     * @param host that sent the message
+     */
+    private void uponReadTagMembership(ReadTagMembership msg, Host host, short sourceProto, int channelID) {
+        if (ready) {
+            logger.info("[{}] Received {} from {}", myself, msg, host);
+            ReadTagReplyMembership readTagReply = new ReadTagReplyMembership(membershipTag, msg.getOpSec());
 
+            openConnection(host);
+            sendMessage(readTagReply, host);
+        }
+    }
 
     /**
      * When receiving a read tag from a host who received a write request.<br>
@@ -385,6 +445,36 @@ public class ABD extends GenericProtocol {
         return max;
     }
 
+    private void uponReadTagReplyMembership(ReadTagReplyMembership msg, Host host, short sourceProto, int channelID) {
+        if (ready) {
+            logger.info("[{}] Received {} from {}", myself, msg, host);
+            // Probably an old operation
+            if(inProgressOperations.containsKey(MEMBERSHIP_KEY+ msg.getPeerOpID())) {
+                MembershipOperation op = (MembershipOperation) inProgressOperations.get(MEMBERSHIP_KEY+msg.getPeerOpID());
+                op.getAnswersReadTag().add(msg.getTag());
+                if (op.getAnswersReadTag().size() == ((membership.size()+1)/2)+1) {
+                    logger.info("[{}] QUORUM for Operation: {}", myself, op);
+                    int new_tag = getMaxSQTag(op.getAnswersReadTag());
+                    opSeq.incrementAndGet();
+                    op.incrementOpSeq();
+                    WriteMessageMembership wmm = new WriteMessageMembership(
+                            op.getOpSeq(),
+                            Pair.of(new_tag+1, myself),
+                            op.getPending().getRight(),
+                            Action.JOIN
+                    );
+
+                    for (Host peer : membership) {
+                        openConnection(peer);
+                        sendMessage(wmm, peer);
+                    }
+
+                    op.getAnswersAck().add(myself);
+                }
+            }
+        }
+    }
+
     /**
      * When receiving a tag requested earlier on {@link ABD#uponWriteRequest(WriteRequest, short)}.
      *
@@ -403,7 +493,7 @@ public class ABD extends GenericProtocol {
                 // We have enough answers for a quorum
                 if (op.getAnswersReadTag().size() == ((membership.size() + 1)/2)+1) {
                     logger.info("[{}] Operation: {}", myself, op);
-                    int new_tag = getMaxSQTag((HashSet<Pair<Integer, Host>>) op.getAnswersReadTag());
+                    int new_tag = getMaxSQTag(op.getAnswersReadTag());
                     opSeq.incrementAndGet();
                     op.incrementOpSeq();
                     WriteMessage wm = new WriteMessage(
@@ -431,6 +521,36 @@ public class ABD extends GenericProtocol {
     }
 
     /**
+     * When receiving a WriteMessage to change the membership
+     *
+     * @param msg received
+     * @param host of the original sender
+     */
+    private void uponWriteMessageMembership(WriteMessageMembership msg, Host host, short sourceProto, int channelID) {
+        if (ready) {
+            logger.info("[{}] Received {} from {}", myself, msg, host);
+            this.membershipTag = msg.getTag();
+            switch (msg.getAction()) {
+                case JOIN:
+                    pendingMembership.add(msg.getReplica());
+                    break;
+                case REMOVE:
+                    membership.remove(msg.getReplica());
+                    break;
+            }
+
+            AckMembership ack = new AckMembership(
+                    msg.getOpSeq(),
+                    (MEMBERSHIP_KEY+msg.getOpSeq()).toCharArray(),
+                    msg.getAction()
+            );
+
+            openConnection(host);
+            sendMessage(ack, host);
+        }
+    }
+
+    /**
      * When receiving WriteMessage, which instructs the replica to write the new value and new tag.
      *
      * @param msg containing the key, value and tag of the message.
@@ -452,9 +572,67 @@ public class ABD extends GenericProtocol {
         }
     }
 
+    private void uponJoinReply(JoinReply msg, Host host, short sourceProto, int channelId) {
+
+        this.membership = msg.getMembership();
+        this.membershipTag = msg.getMembershipTag();
+        this.ready = true;
+
+        JoinnedMessage jm = new JoinnedMessage(opSeq.get());
+        // TODO - replace by reliable broadcast
+        for (Host peer : membership) {
+            openConnection(peer);
+            sendMessage(jm, peer);
+        }
+
+        logger.info("[{}] Joinned the system", myself);
+    }
+
+    private void uponJoinnedMessage(JoinnedMessage msg, Host host, short sourceProto, int channelId) {
+        logger.info("[{}] Received {} from {}", myself, msg, host);
+        pendingMembership.remove(host);
+        membership.add(host);
+    }
+
+    /**
+     * Ack membership
+     * @param msg received with ack of membership operation
+     * @param host who sent the msg
+     */
+    private void uponAckMembership(AckMembership msg, Host host, short sourceProto, int channelId) {
+        if (ready) {
+            logger.info("[{}] Received {} from {}", myself, msg, host);
+            System.out.println(inProgressOperations.containsKey(MEMBERSHIP_KEY + msg.getOpSeq()));
+            if(inProgressOperations.containsKey(MEMBERSHIP_KEY + msg.getOpSeq())) {
+                MembershipOperation op = (MembershipOperation) inProgressOperations.get(MEMBERSHIP_KEY + msg.getOpSeq());
+                System.out.println(msg.getOpSeq());
+                System.out.println(op.getOpSeq());
+                if (msg.getOpSeq() == op.getOpSeq()) {
+                    logger.info("Inside");
+                    op.getAnswersAck().add(host);
+                    if (op.getAnswersAck().size() == (membership.size()+1)/2 + 1) {
+                        logger.info("[{}] Sending state to new replica", myself);
+                        switch (msg.getAction()) {
+                            case JOIN:
+                                pendingMembership.add(op.getPending().getRight());
+                                // Membership still doesn't have new replica
+                                JoinReply jr = new JoinReply(this.membership, membershipTag);
+                                openConnection(op.getPending().getRight());
+                                sendMessage(jr, op.getPending().getRight());
+                                break;
+
+                            case REMOVE:
+                                membership.remove(op.getPending().getRight());
+                                break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * When receiving an ACK from an operation (Read/Write/Membership).
-     *
      * Must filter membership operations is instance of
      *
      * @param msg ack
@@ -521,6 +699,7 @@ public class ABD extends GenericProtocol {
                     tagSend,
                     valToSend
             );
+
             openConnection(host);
             sendMessage(rp, host);
         }
@@ -532,7 +711,7 @@ public class ABD extends GenericProtocol {
      * @param answers received from the quorum
      * @return the higher tag
      */
-    private ReadReply getMaxReply(Set<ProtoMessage> answers) {
+    private ReadReply getMaxReply(Set<ReadReply> answers) {
         return answers.stream()
                 .max(Comparator.comparing(reply -> reply.getTag() != null ? reply.getTag().getLeft() : 0))
                 .orElseThrow(() -> new IllegalArgumentException("Answers set cannot be empty"));

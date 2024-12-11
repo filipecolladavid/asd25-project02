@@ -7,17 +7,11 @@ public class AddReplicaRequest extends ProtoRequest {
 
     public static final short REQUEST_ID = 103;
 
-    private final int instance;
     private final Host replica;
 
-    public AddReplicaRequest(int instance, Host replica) {
+    public AddReplicaRequest(Host replica) {
         super(REQUEST_ID);
-        this.instance = instance;
         this.replica = replica;
-    }
-
-    public int getInstance() {
-        return instance;
     }
 
     public Host getReplica() {
@@ -28,7 +22,6 @@ public class AddReplicaRequest extends ProtoRequest {
     @Override
     public String toString() {
         return "AddReplicaRequest{" +
-                "instance=" + instance +
                 ", replica=" + replica +
                 '}';
     }

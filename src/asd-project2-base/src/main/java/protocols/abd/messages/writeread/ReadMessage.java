@@ -1,15 +1,17 @@
-package protocols.abd.messages;
+package protocols.abd.messages.writeread;
 
 import io.netty.buffer.ByteBuf;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
 import pt.unl.fct.di.novasys.network.ISerializer;
 
-public class Ack extends ProtoMessage {
-    public final static short MSG_ID = 105;
+import java.io.IOException;
+
+public class ReadMessage extends ProtoMessage {
+    public final static short MSG_ID = 109;
     private final int opSeq;
     private final char[] key;
 
-    public Ack(int opSeq, char[] key) {
+    public ReadMessage(int opSeq, char[] key) {
         super(MSG_ID);
         this.opSeq = opSeq;
         this.key = key;
@@ -23,10 +25,19 @@ public class Ack extends ProtoMessage {
         return key;
     }
 
-    public static ISerializer<Ack> serializer = new ISerializer<Ack>() {
+
+    @Override
+    public String toString() {
+        return "ReadMessage: {" +
+                "opSeq=" + opSeq +
+                ", key='"+ new String(key) +'\''+
+                "}";
+    }
+
+    public static ISerializer<ReadMessage> serializer = new ISerializer<ReadMessage>() {
         @Override
-        public void serialize(Ack msg, ByteBuf out) {
-            out.writeInt(msg.opSeq);
+        public void serialize(ReadMessage msg, ByteBuf out) throws IOException {
+            out.writeInt(msg.getOpSeq());
             serializeCharArray(out, msg.getKey());
         }
 
@@ -38,10 +49,10 @@ public class Ack extends ProtoMessage {
         }
 
         @Override
-        public Ack deserialize(ByteBuf in) {
+        public ReadMessage deserialize(ByteBuf in) throws IOException {
             int opSeq = in.readInt();
             char[] key = deserializeCharArray(in);
-            return new Ack(opSeq, key);
+            return new ReadMessage(opSeq, key);
         }
 
         private char[] deserializeCharArray(ByteBuf in) {

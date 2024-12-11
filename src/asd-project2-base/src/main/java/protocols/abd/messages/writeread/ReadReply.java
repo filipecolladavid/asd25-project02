@@ -1,4 +1,4 @@
-package protocols.abd.messages;
+package protocols.abd.messages.writeread;
 
 import io.netty.buffer.ByteBuf;
 import org.apache.commons.lang3.tuple.Pair;
@@ -8,51 +8,54 @@ import pt.unl.fct.di.novasys.network.data.Host;
 
 import java.io.IOException;
 
-public class WriteMessage extends ProtoMessage {
-    public final static short MSG_ID = 103;
-    private final int opSeq;
+public class ReadReply extends ProtoMessage {
+    public final static short MSG_ID = 110;
+    private final int peerOpID;
     private final char[] key;
     private final Pair<Integer, Host> tag;
-    private final byte[] data;
+    private final byte[] value;
 
-    public WriteMessage(int opSeq, char[] key, Pair<Integer, Host> tag, byte[] data) {
+    public ReadReply(int peerOpID, char[] key, Pair<Integer, Host> tag, byte[] value) {
         super(MSG_ID);
-        this.opSeq = opSeq;
+        this.peerOpID = peerOpID;
         this.key = key;
         this.tag = tag;
-        this.data = data;
-    }
-
-    public int getOpSeq() {
-        return opSeq;
+        this.value = value;
     }
 
     public char[] getKey() {
         return key;
     }
 
-    public Pair<Integer, Host> getTag() { return tag; }
+    public int getPeerOpID() {
+        return peerOpID;
+    }
 
+    public Pair<Integer, Host> getTag() {
+        return tag;
+    }
 
-    public byte[] getData() { return data; }
+    public byte[] getValue() {
+        return value;
+    }
 
     @Override
     public String toString() {
-        return "WriteMessage: {" +
-                "opSeq=" + opSeq +
-                ", key='"+ new String(key) +'\''+
+        return "ReadReply: {" +
+                "key='"+ new String(key) +'\''+
                 ", tag='" + tag + '\''+
+                ", id=" + peerOpID +
                 "}";
     }
 
-    public static ISerializer<WriteMessage> serializer = new ISerializer<WriteMessage>() {
+    public static ISerializer<ReadReply> serializer = new ISerializer<ReadReply>() {
         @Override
-        public void serialize(WriteMessage msg, ByteBuf out) throws IOException {
-            out.writeInt(msg.opSeq);
+        public void serialize(ReadReply msg, ByteBuf out) throws IOException {
             serializeCharArray(out, msg.getKey());
             out.writeInt(msg.getTag().getLeft());
             Host.serializer.serialize(msg.getTag().getRight(), out);
-            serializeByteArray(out, msg.getData());
+            out.writeInt(msg.getPeerOpID());
+            serializeByteArray(out, msg.getValue());
         }
 
         private void serializeByteArray(ByteBuf out, byte[] array) {
@@ -73,14 +76,14 @@ public class WriteMessage extends ProtoMessage {
         }
 
         @Override
-        public WriteMessage deserialize(ByteBuf in) throws IOException {
-            int opSeq = in.readInt();
+        public ReadReply deserialize(ByteBuf in) throws IOException {
             char[] key = deserializeCharArray(in);
             int tagLeft = in.readInt();
             Host h = Host.serializer.deserialize(in);
             Pair<Integer, Host> p = Pair.of(tagLeft, h);
-            byte[] data = deserializeByteArray(in);
-            return new WriteMessage(opSeq, key, p, data);
+            int id = in.readInt();
+            byte[] value = deserializeByteArray(in);
+            return new ReadReply(id, key, p, value);
         }
 
         private byte[] deserializeByteArray(ByteBuf in) {

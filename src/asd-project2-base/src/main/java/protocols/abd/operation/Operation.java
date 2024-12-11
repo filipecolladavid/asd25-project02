@@ -11,7 +11,7 @@ import java.util.Set;
 public abstract class Operation {
     Set<ProtoMessage> answersReadReply;
     Set<Host> answersAck;
-    Set<Pair<Integer, Host>> answersReadTag;
+    HashSet<Pair<Integer, Host>> answersReadTag;
     ProtoRequest request;
     int opSeq;
 
@@ -43,11 +43,11 @@ public abstract class Operation {
         this.request = request;
     }
 
-    public Set<Pair<Integer, Host>> getAnswersReadTag() {
+    public HashSet<Pair<Integer, Host>> getAnswersReadTag() {
         return answersReadTag;
     }
 
-    public void setAnswersReadTag(Set<Pair<Integer, Host>> answersReadTag) {
+    public void setAnswersReadTag(HashSet<Pair<Integer, Host>> answersReadTag) {
         this.answersReadTag = answersReadTag;
     }
 
@@ -57,13 +57,5 @@ public abstract class Operation {
 
     public void setAnswersAck(Set<Host> answersAck) {
         this.answersAck = answersAck;
-    }
-
-    public Set<ProtoMessage> getAnswersReadReply() {
-        return answersReadReply;
-    }
-
-    public void setAnswersReadReply(Set<ProtoMessage> answersReadReply) {
-        this.answersReadReply = answersReadReply;
     }
 }

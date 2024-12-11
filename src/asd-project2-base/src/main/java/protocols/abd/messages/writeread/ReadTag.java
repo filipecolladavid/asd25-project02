@@ -1,43 +1,41 @@
-package protocols.abd.messages;
+package protocols.abd.messages.writeread;
 
 import io.netty.buffer.ByteBuf;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
 import pt.unl.fct.di.novasys.network.ISerializer;
 
-import java.io.IOException;
+public class ReadTag extends ProtoMessage {
 
-public class ReadMessage extends ProtoMessage {
-    public final static short MSG_ID = 106;
-    private final int opSeq;
-    private final char[] key;
+    public final static short MSG_ID = 111;
+    private int opSec;
+    private char[] key;
 
-    public ReadMessage(int opSeq, char[] key) {
+    public ReadTag(int opSec, char[] key) {
         super(MSG_ID);
-        this.opSeq = opSeq;
+        this.opSec = opSec;
         this.key = key;
     }
 
-    public int getOpSeq() {
-        return opSeq;
+    public int getOpSec() {
+        return opSec;
     }
 
     public char[] getKey() {
         return key;
     }
 
-
     @Override
     public String toString() {
-        return "ReadMessage: {" +
-                "opSeq=" + opSeq +
-                ", key='"+ new String(key) +'\''+
+        return "ReadTag={" +
+                "opSec="+opSec+
+                ", key="+ new String(key) +
                 "}";
     }
 
-    public static ISerializer<ReadMessage> serializer = new ISerializer<ReadMessage>() {
+    public static ISerializer<ReadTag> serializer = new ISerializer<ReadTag>() {
         @Override
-        public void serialize(ReadMessage msg, ByteBuf out) throws IOException {
-            out.writeInt(msg.getOpSeq());
+        public void serialize(ReadTag msg, ByteBuf out) {
+            out.writeInt(msg.opSec);
             serializeCharArray(out, msg.getKey());
         }
 
@@ -49,10 +47,10 @@ public class ReadMessage extends ProtoMessage {
         }
 
         @Override
-        public ReadMessage deserialize(ByteBuf in) throws IOException {
-            int opSeq = in.readInt();
+        public ReadTag deserialize(ByteBuf in) {
+            int opSec = in.readInt();
             char[] key = deserializeCharArray(in);
-            return new ReadMessage(opSeq, key);
+            return new ReadTag(opSec, key);
         }
 
         private char[] deserializeCharArray(ByteBuf in) {

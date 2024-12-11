@@ -1,4 +1,4 @@
-package protocols.abd.messages;
+package protocols.abd.messages.membership;
 
 import io.netty.buffer.ByteBuf;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
@@ -8,7 +8,7 @@ import pt.unl.fct.di.novasys.network.data.Host;
 import java.io.IOException;
 
 public class JoinMessage extends ProtoMessage {
-    public final static short MSG_ID = 108;
+    public final static short MSG_ID = 102;
     private final Host myself;
 
     public JoinMessage(Host myself) {

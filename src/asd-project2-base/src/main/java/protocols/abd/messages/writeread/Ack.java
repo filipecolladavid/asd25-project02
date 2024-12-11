@@ -1,41 +1,32 @@
-package protocols.abd.messages;
+package protocols.abd.messages.writeread;
 
 import io.netty.buffer.ByteBuf;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
 import pt.unl.fct.di.novasys.network.ISerializer;
 
-public class ReadTagMembership extends ProtoMessage {
+public class Ack extends ProtoMessage {
+    public final static short MSG_ID = 108;
+    private final int opSeq;
+    private final char[] key;
 
-    public final static short MSG_ID = 101;
-    private int opSec;
-    private char[] key;
-
-    public ReadTagMembership(int opSec, char[] key) {
+    public Ack(int opSeq, char[] key) {
         super(MSG_ID);
-        this.opSec = opSec;
+        this.opSeq = opSeq;
         this.key = key;
     }
 
-    public int getOpSec() {
-        return opSec;
+    public int getOpSeq() {
+        return opSeq;
     }
 
     public char[] getKey() {
         return key;
     }
 
-    @Override
-    public String toString() {
-        return "ReadTagMembership={" +
-                "opSec="+opSec+
-                ", key="+ new String(key) +
-                "}";
-    }
-
-    public static ISerializer<ReadTagMembership> serializer = new ISerializer<ReadTagMembership>() {
+    public static ISerializer<Ack> serializer = new ISerializer<Ack>() {
         @Override
-        public void serialize(ReadTagMembership msg, ByteBuf out) {
-            out.writeInt(msg.opSec);
+        public void serialize(Ack msg, ByteBuf out) {
+            out.writeInt(msg.opSeq);
             serializeCharArray(out, msg.getKey());
         }
 
@@ -47,10 +38,10 @@ public class ReadTagMembership extends ProtoMessage {
         }
 
         @Override
-        public ReadTagMembership deserialize(ByteBuf in) {
-            int opSec = in.readInt();
+        public Ack deserialize(ByteBuf in) {
+            int opSeq = in.readInt();
             char[] key = deserializeCharArray(in);
-            return new ReadTagMembership(opSec, key);
+            return new Ack(opSeq, key);
         }
 
         private char[] deserializeCharArray(ByteBuf in) {
