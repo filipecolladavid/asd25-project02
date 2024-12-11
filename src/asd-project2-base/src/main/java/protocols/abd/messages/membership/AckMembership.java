@@ -4,16 +4,19 @@ import io.netty.buffer.ByteBuf;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
 import pt.unl.fct.di.novasys.network.ISerializer;
 
+import java.util.UUID;
+
 public class AckMembership extends ProtoMessage {
     public final static short MSG_ID = 101;
     private final int opSeq;
-    private final char[] key;
+
+    private final UUID opID;
     private final Action action;
 
-    public AckMembership(int opSeq, char[] key, Action action) {
+    public AckMembership(int opSeq, UUID opID, Action action) {
         super(MSG_ID);
         this.opSeq = opSeq;
-        this.key = key;
+        this.opID = opID;
         this.action = action;
     }
 
@@ -25,9 +28,8 @@ public class AckMembership extends ProtoMessage {
     public int getOpSeq() {
         return opSeq;
     }
-
-    public char[] getKey() {
-        return key;
+    public UUID getOpID() {
+        return opID;
     }
 
     public static ISerializer<AckMembership> serializer = new ISerializer<AckMembership>() {
@@ -35,7 +37,7 @@ public class AckMembership extends ProtoMessage {
         public void serialize(AckMembership msg, ByteBuf out) {
             out.writeInt(msg.getAction().ordinal());
             out.writeInt(msg.opSeq);
-            serializeCharArray(out, msg.getKey());
+            serializeCharArray(out, msg.getOpID().toString().toCharArray());
         }
 
         private void serializeCharArray(ByteBuf out, char[] array) {
@@ -49,8 +51,8 @@ public class AckMembership extends ProtoMessage {
         public AckMembership deserialize(ByteBuf in) {
             Action action = Action.values()[in.readInt()];
             int opSeq = in.readInt();
-            char[] key = deserializeCharArray(in);
-            return new AckMembership(opSeq, key, action);
+            UUID opID = UUID.fromString(new String(deserializeCharArray(in)));
+            return new AckMembership(opSeq, opID, action);
         }
 
         private char[] deserializeCharArray(ByteBuf in) {

@@ -59,7 +59,6 @@ public class ABD extends GenericProtocol {
     /**
      * Membership replicated
      */
-    private final static String MEMBERSHIP_KEY = "membership";
     // Equivalent to state in ABD
     private HashSet<Host> membership;
     // Holds the replicas yet to join
@@ -236,8 +235,15 @@ public class ABD extends GenericProtocol {
      */
     private void uponJoinMessage(JoinMessage msg, Host host, short sourceProto, int channelId) {
         logger.info("{} is trying to join the system", msg.getMyself());
-        Operation op = new MembershipOperation(new AddReplicaRequest(msg.getMyself()), opSeq.incrementAndGet());
-        pendingOperations.add(Pair.of(MEMBERSHIP_KEY+opSeq.get(), op));
+        // Used to know the operation
+        UUID uuid = UUID.randomUUID();
+        Operation op = new MembershipOperation(new AddReplicaRequest(
+                msg.getMyself()),
+                opSeq.incrementAndGet(),
+                uuid,
+                msg.getMyself()
+        );
+        pendingOperations.add(Pair.of(uuid.toString(), op));
     }
 
     /**
@@ -326,15 +332,12 @@ public class ABD extends GenericProtocol {
      */
     private void startMembershipOperation(MembershipOperation op, int opNumSeq) {
         logger.info("[{}]Starting Add Replica Operation", myself);
-        AddReplicaRequest request = (AddReplicaRequest) op.getRequest();
-        UUID uuid = UUID.randomUUID();
-        op.setPending(Pair.of(uuid, request.getReplica()));
 
         // Updated tag to broadcast
         membershipTag = Pair.of(opNumSeq, myself);
         op.getAnswersReadTag().add(membershipTag);
 
-        ReadTagMembership rt = new ReadTagMembership(opNumSeq);
+        ReadTagMembership rt = new ReadTagMembership(opNumSeq, op.getPending().getLeft());
 
         // TODO - Replace by reliable broadcast
         for (Host peer: membership) {
@@ -366,6 +369,11 @@ public class ABD extends GenericProtocol {
         }
     }
 
+    /**
+     * Starts the queued Read operation
+     *
+     * @param op the Write operation being executed
+     */
     private void startReadOperation(ReadWriteOperation op, int opNumSeq) {
         ReadRequest request = (ReadRequest) op.getRequest();
         ReadMessage rm = new ReadMessage(opNumSeq, request.getKey());
@@ -396,7 +404,7 @@ public class ABD extends GenericProtocol {
     private void uponReadTagMembership(ReadTagMembership msg, Host host, short sourceProto, int channelID) {
         if (ready) {
             logger.info("[{}] Received {} from {}", myself, msg, host);
-            ReadTagReplyMembership readTagReply = new ReadTagReplyMembership(membershipTag, msg.getOpSec());
+            ReadTagReplyMembership readTagReply = new ReadTagReplyMembership(membershipTag, msg.getOpID());
 
             openConnection(host);
             sendMessage(readTagReply, host);
@@ -449,8 +457,9 @@ public class ABD extends GenericProtocol {
         if (ready) {
             logger.info("[{}] Received {} from {}", myself, msg, host);
             // Probably an old operation
-            if(inProgressOperations.containsKey(MEMBERSHIP_KEY+ msg.getPeerOpID())) {
-                MembershipOperation op = (MembershipOperation) inProgressOperations.get(MEMBERSHIP_KEY+msg.getPeerOpID());
+            logger.info("[{}] Upon Read TagReply Membership key: {}", myself);
+            if(inProgressOperations.containsKey(msg.getPeerOpID().toString())) {
+                MembershipOperation op = (MembershipOperation) inProgressOperations.get(msg.getPeerOpID().toString());
                 op.getAnswersReadTag().add(msg.getTag());
                 if (op.getAnswersReadTag().size() == ((membership.size()+1)/2)+1) {
                     logger.info("[{}] QUORUM for Operation: {}", myself, op);
@@ -461,6 +470,7 @@ public class ABD extends GenericProtocol {
                             op.getOpSeq(),
                             Pair.of(new_tag+1, myself),
                             op.getPending().getRight(),
+                            msg.getPeerOpID(),
                             Action.JOIN
                     );
 
@@ -541,7 +551,7 @@ public class ABD extends GenericProtocol {
 
             AckMembership ack = new AckMembership(
                     msg.getOpSeq(),
-                    (MEMBERSHIP_KEY+msg.getOpSeq()).toCharArray(),
+                    msg.getOpID(),
                     msg.getAction()
             );
 
@@ -602,13 +612,9 @@ public class ABD extends GenericProtocol {
     private void uponAckMembership(AckMembership msg, Host host, short sourceProto, int channelId) {
         if (ready) {
             logger.info("[{}] Received {} from {}", myself, msg, host);
-            System.out.println(inProgressOperations.containsKey(MEMBERSHIP_KEY + msg.getOpSeq()));
-            if(inProgressOperations.containsKey(MEMBERSHIP_KEY + msg.getOpSeq())) {
-                MembershipOperation op = (MembershipOperation) inProgressOperations.get(MEMBERSHIP_KEY + msg.getOpSeq());
-                System.out.println(msg.getOpSeq());
-                System.out.println(op.getOpSeq());
+            if(inProgressOperations.containsKey(msg.getOpID().toString())) {
+                MembershipOperation op = (MembershipOperation) inProgressOperations.get(msg.getOpID().toString());
                 if (msg.getOpSeq() == op.getOpSeq()) {
-                    logger.info("Inside");
                     op.getAnswersAck().add(host);
                     if (op.getAnswersAck().size() == (membership.size()+1)/2 + 1) {
                         logger.info("[{}] Sending state to new replica", myself);
@@ -658,8 +664,6 @@ public class ABD extends GenericProtocol {
                             inProgressOperations.remove(new String(msg.getKey()));
                         } else {
                             logger.info("[{}]Triggered Read Complete notification", myself);
-                            System.out.println(op.getPending().getLeft());
-                            System.out.println(Arrays.toString(op.getPending().getRight()));
                             triggerNotification(new ReadCompleteNotification(
                                     msg.getKey(),
                                     op.getPending().getRight(),

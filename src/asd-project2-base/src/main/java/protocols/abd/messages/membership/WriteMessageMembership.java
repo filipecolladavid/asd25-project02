@@ -7,6 +7,7 @@ import pt.unl.fct.di.novasys.network.ISerializer;
 import pt.unl.fct.di.novasys.network.data.Host;
 
 import java.io.IOException;
+import java.util.UUID;
 
 public class WriteMessageMembership extends ProtoMessage {
     public final static short MSG_ID = 107;
@@ -14,12 +15,14 @@ public class WriteMessageMembership extends ProtoMessage {
     private final Pair<Integer, Host> tag;
     private final Host replica;
     private final Action action;
+    private final UUID opID;
 
 
 
-    public WriteMessageMembership(int opSeq, Pair<Integer, Host> tag, Host replica, Action action) {
+    public WriteMessageMembership(int opSeq, Pair<Integer, Host> tag, Host replica, UUID opID, Action action) {
         super(MSG_ID);
         this.opSeq = opSeq;
+        this.opID = opID;
         this.tag = tag;
         this.replica = replica;
         this.action = action;
@@ -31,6 +34,10 @@ public class WriteMessageMembership extends ProtoMessage {
 
     public Action getAction() {
         return action;
+    }
+
+    public UUID getOpID() {
+        return opID;
     }
 
     public int getOpSeq() {
@@ -55,14 +62,15 @@ public class WriteMessageMembership extends ProtoMessage {
             out.writeInt(msg.getTag().getLeft());
             Host.serializer.serialize(msg.getTag().getRight(), out);
             Host.serializer.serialize(msg.getReplica(), out);
+            serializeCharArray(out, msg.getOpID().toString().toCharArray());
         }
-//
-//        private void serializeHashSet(ByteBuf out, Host replica) throws IOException {
-//            out.writeInt(membership.size());
-//            for (Host member : membership) {
-//                Host.serializer.serialize(member, out);
-//            }
-//        }
+
+        private void serializeCharArray(ByteBuf out, char[] array) {
+            out.writeInt(array.length);
+            for(char c : array) {
+                out.writeChar(c);
+            }
+        }
 
         @Override
         public WriteMessageMembership deserialize(ByteBuf in) throws IOException {
@@ -72,18 +80,17 @@ public class WriteMessageMembership extends ProtoMessage {
             Host h = Host.serializer.deserialize(in);
             Pair<Integer, Host> p = Pair.of(tagLeft, h);
             Host replica = Host.serializer.deserialize(in);
-            return new WriteMessageMembership(opSeq, p, replica, action);
+            UUID id = UUID.fromString(new String(deserializeCharArray(in)));
+            return new WriteMessageMembership(opSeq, p, replica, id, action);
         }
 
-//        private Set<Host> deserializeHashSet(ByteBuf in) throws IOException {
-//            Host replica = new HashSet<>();
-//            int size = in.readInt();
-//            for (int i = 0; i < size; i++) {
-//                Host h = Host.serializer.deserialize(in);
-//                membership.add(h);
-//            }
-//            return membership;
-//        }
-
+        private char[] deserializeCharArray(ByteBuf in) {
+            int length = in.readInt();
+            char[] array = new char[length];
+            for(int i = 0; i < length; i++) {
+                array[i] = in.readChar();
+            }
+            return array;
+        }
     };
 }

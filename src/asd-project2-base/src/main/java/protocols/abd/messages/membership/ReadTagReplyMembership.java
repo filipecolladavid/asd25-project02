@@ -7,18 +7,19 @@ import pt.unl.fct.di.novasys.network.ISerializer;
 import pt.unl.fct.di.novasys.network.data.Host;
 
 import java.io.IOException;
+import java.util.UUID;
 
 public class ReadTagReplyMembership extends ProtoMessage {
     public final static short MSG_ID = 106;
     private final Pair<Integer, Host> tag;
-    private final int peerOpID;
-    public ReadTagReplyMembership(Pair<Integer, Host> tag, int peerOpID) {
+    private final UUID peerOpID;
+    public ReadTagReplyMembership(Pair<Integer, Host> tag, UUID peerOpID) {
         super(MSG_ID);
         this.peerOpID = peerOpID;
         this.tag = tag;
     }
 
-    public int getPeerOpID() {
+    public UUID getPeerOpID() {
         return peerOpID;
     }
 
@@ -39,7 +40,14 @@ public class ReadTagReplyMembership extends ProtoMessage {
         public void serialize(ReadTagReplyMembership msg, ByteBuf out) throws IOException {
             out.writeInt(msg.getTag().getLeft());
             Host.serializer.serialize(msg.getTag().getRight(), out);
-            out.writeInt(msg.getPeerOpID());
+            serializeCharArray(out, msg.getPeerOpID().toString().toCharArray());
+        }
+
+        private void serializeCharArray(ByteBuf out, char[] array) {
+            out.writeInt(array.length);
+            for(char c : array) {
+                out.writeChar(c);
+            }
         }
 
         @Override
@@ -47,7 +55,7 @@ public class ReadTagReplyMembership extends ProtoMessage {
             int tagLeft = in.readInt();
             Host h = Host.serializer.deserialize(in);
             Pair<Integer, Host> p = Pair.of(tagLeft, h);
-            int id = in.readInt();
+            UUID id = UUID.fromString(new String(deserializeCharArray(in)));
             return new ReadTagReplyMembership(p, id);
         }
 
