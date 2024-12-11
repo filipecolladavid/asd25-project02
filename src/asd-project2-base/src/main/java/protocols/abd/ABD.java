@@ -588,7 +588,7 @@ public class ABD extends GenericProtocol {
         this.membershipTag = msg.getMembershipTag();
         this.ready = true;
 
-        JoinnedMessage jm = new JoinnedMessage(opSeq.get());
+        JoinnedMessage jm = new JoinnedMessage(opSeq.get(), msg.getOpID());
         // TODO - replace by reliable broadcast
         for (Host peer : membership) {
             openConnection(peer);
@@ -600,6 +600,7 @@ public class ABD extends GenericProtocol {
 
     private void uponJoinnedMessage(JoinnedMessage msg, Host host, short sourceProto, int channelId) {
         logger.info("[{}] Received {} from {}", myself, msg, host);
+        inProgressOperations.remove(msg.getOpID().toString());
         pendingMembership.remove(host);
         membership.add(host);
     }
@@ -622,7 +623,7 @@ public class ABD extends GenericProtocol {
                             case JOIN:
                                 pendingMembership.add(op.getPending().getRight());
                                 // Membership still doesn't have new replica
-                                JoinReply jr = new JoinReply(this.membership, membershipTag);
+                                JoinReply jr = new JoinReply(this.membership, membershipTag, msg.getOpID());
                                 openConnection(op.getPending().getRight());
                                 sendMessage(jr, op.getPending().getRight());
                                 break;

@@ -9,6 +9,7 @@ import pt.unl.fct.di.novasys.network.data.Host;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.UUID;
 
 /**
  * No need to send state, just membership, because writes and reads are always propagated
@@ -17,11 +18,13 @@ public class JoinReply extends ProtoMessage {
     public final static short MSG_ID = 104;
     private final HashSet<Host> membership;
     private final Pair<Integer, Host> membershipTag;
+    private final UUID opID;
 
-    public JoinReply(HashSet<Host> membership, Pair<Integer, Host> membershipTag) {
+    public JoinReply(HashSet<Host> membership, Pair<Integer, Host> membershipTag, UUID opID) {
         super(MSG_ID);
         this.membership = membership;
         this.membershipTag = membershipTag;
+        this.opID = opID;
     }
 
     public HashSet<Host> getMembership() {
@@ -32,12 +35,24 @@ public class JoinReply extends ProtoMessage {
         return membershipTag;
     }
 
+    public UUID getOpID() {
+        return opID;
+    }
+
     public static ISerializer<JoinReply> serializer = new ISerializer<JoinReply>() {
         @Override
         public void serialize(JoinReply msg, ByteBuf out) throws IOException {
             out.writeInt(msg.getMembershipTag().getLeft());
             Host.serializer.serialize(msg.getMembershipTag().getRight(), out);
             serializeHashSet(out, msg.getMembership());
+            serializeCharArray(out, msg.getOpID().toString().toCharArray());
+        }
+
+        private void serializeCharArray(ByteBuf out, char[] array) {
+            out.writeInt(array.length);
+            for(char c : array) {
+                out.writeChar(c);
+            }
         }
 
         private void serializeHashSet(ByteBuf out, HashSet<Host> membership) throws IOException {
@@ -53,7 +68,17 @@ public class JoinReply extends ProtoMessage {
             Host membershipTagHost = Host.serializer.deserialize(in);
             HashSet<Host> membership = deserializeHashSet(in);
             Pair<Integer, Host> membershipTag = Pair.of(membershipTagCounter, membershipTagHost);
-            return new JoinReply(membership, membershipTag);
+            UUID id = UUID.fromString(new String(deserializeCharArray(in)));
+            return new JoinReply(membership, membershipTag, id);
+        }
+
+        private char[] deserializeCharArray(ByteBuf in) {
+            int length = in.readInt();
+            char[] array = new char[length];
+            for(int i = 0; i < length; i++) {
+                array[i] = in.readChar();
+            }
+            return array;
         }
 
         private HashSet<Host> deserializeHashSet(ByteBuf in) throws IOException {
@@ -67,3 +92,4 @@ public class JoinReply extends ProtoMessage {
         }
     };
 }
+
