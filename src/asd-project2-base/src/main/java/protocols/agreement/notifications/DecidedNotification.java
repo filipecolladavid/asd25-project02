@@ -1,6 +1,5 @@
 package protocols.agreement.notifications;
 
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.UUID;
 
@@ -21,11 +20,12 @@ public class DecidedNotification extends ProtoNotification {
     private final byte[] operationPayload;
     private final LinkedList<Host> membership;
 
-    public DecidedNotification(UUID operationId, DecisionType decisionType, LinkedList<Host> membership) {
+    public DecidedNotification(UUID operationId, DecisionType decisionType, LinkedList<Host> membership,
+            byte[] operationPayload) {
         super(NOTIFICATION_ID);
         this.operationId = operationId;
         this.decisionType = decisionType;
-        this.operationPayload = null;
+        this.operationPayload = operationPayload;
         this.membership = membership;
     }
 

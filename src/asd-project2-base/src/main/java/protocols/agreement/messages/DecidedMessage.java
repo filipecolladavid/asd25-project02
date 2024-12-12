@@ -14,11 +14,13 @@ public class DecidedMessage extends ProtoMessage {
 
     private final UUID operationID;
     private LinkedList<Host> membership;
+    private byte[] operationPayload;
 
-    public DecidedMessage(UUID operationID, LinkedList<Host> membership) {
+    public DecidedMessage(UUID operationID, LinkedList<Host> membership, byte[] operationPayload) {
         super(MESSAGE_ID);
         this.operationID = operationID;
         this.membership = membership;
+        this.operationPayload = operationPayload;
     }
 
     public UUID getOperationID() {
@@ -29,11 +31,16 @@ public class DecidedMessage extends ProtoMessage {
         return membership;
     }
 
+    public byte[] getOperationPayload() {
+        return operationPayload;
+    }
+
     @Override
     public String toString() {
         return "DecidedMessage{" +
                 "operationID=" + operationID +
                 ", membership=" + membership +
+                ", operationPayload=" + operationPayload +
                 '}';
     }
 
@@ -50,25 +57,31 @@ public class DecidedMessage extends ProtoMessage {
             } else {
                 out.writeInt(0);
             }
+
+            if (msg.operationPayload != null) {
+                out.writeInt(msg.operationPayload.length);
+                out.writeBytes(msg.operationPayload);
+            } else {
+                out.writeInt(0);
+            }
         }
 
         @Override
         public DecidedMessage deserialize(ByteBuf in) throws IOException {
             if (in.readableBytes() < 24) {
-                throw new IOException("Buffer too small - not enough data");
+                throw new IOException("Buffer too small");
             }
-
-            // Read operation ID
             UUID operationId = new UUID(in.readLong(), in.readLong());
-
-            // Read updated membership
             int membershipSize = in.readInt();
             LinkedList<Host> membership = new LinkedList<>();
             for (int i = 0; i < membershipSize; i++) {
                 membership.add(Host.serializer.deserialize(in));
             }
+            int operationPayloadSize = in.readInt();
+            byte[] operationPayload = new byte[operationPayloadSize];
+            in.readBytes(operationPayload);
 
-            return new DecidedMessage(operationId, membership);
+            return new DecidedMessage(operationId, membership, operationPayload);
         }
     };
 }

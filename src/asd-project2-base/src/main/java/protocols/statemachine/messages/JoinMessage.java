@@ -59,17 +59,14 @@ public class JoinMessage extends ProtoMessage {
     public static final ISerializer<JoinMessage> serializer = new ISerializer<>() {
         @Override
         public void serialize(JoinMessage msg, ByteBuf out) throws IOException {
-            // Write operation ID
             out.writeLong(msg.operationId.getMostSignificantBits());
             out.writeLong(msg.operationId.getLeastSignificantBits());
 
-            // Write requester info
             byte[] addressBytes = msg.requester.getAddress().getAddress();
             out.writeInt(addressBytes.length);
             out.writeBytes(addressBytes);
             out.writeInt(msg.requester.getPort());
 
-            // Write membership list
             if (msg.membershipList != null) {
                 out.writeInt(msg.membershipList.size());
                 for (Host host : msg.membershipList) {
@@ -82,7 +79,6 @@ public class JoinMessage extends ProtoMessage {
                 out.writeInt(0);
             }
 
-            // Write current state
             if (msg.currentState != null) {
                 out.writeInt(msg.currentState.length);
                 out.writeBytes(msg.currentState);
@@ -97,10 +93,8 @@ public class JoinMessage extends ProtoMessage {
                 throw new IOException("Buffer too small - not enough data");
             }
 
-            // Read operation ID
             UUID operationId = new UUID(in.readLong(), in.readLong());
 
-            // Read requester info
             int addressLength = in.readInt();
             if (addressLength <= 0 || addressLength > 16) {
                 throw new IOException("Invalid address length: " + addressLength);
@@ -114,7 +108,6 @@ public class JoinMessage extends ProtoMessage {
             }
             Host requester = new Host(address, port);
 
-            // Read membership list
             List<Host> membershipList = new java.util.ArrayList<>();
             int membershipSize = in.readInt();
             for (int i = 0; i < membershipSize; i++) {
@@ -132,7 +125,6 @@ public class JoinMessage extends ProtoMessage {
                 membershipList.add(new Host(hostAddress, hostPort));
             }
 
-            // Read current state
             byte[] currentState = null;
             int stateLength = in.readInt();
             if (stateLength > 0) {

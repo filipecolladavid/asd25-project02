@@ -186,25 +186,29 @@ public class HashApp extends GenericProtocol {
 
             cumulativeHash = appendOpToHash(cumulativeHash, op.getData());
 
-            logger.debug("Executing: " + op);
+            logger.info("Executing: " + op);
             // Execute if it is a write operation
-            if (op.getOpType() == RequestMessage.WRITE)
+            if (op.getOpType() == RequestMessage.WRITE) {
                 data.put(op.getKey(), op.getData());
+            }
             executedOps++;
+
             if (executedOps % 10000 == 0) {
                 logger.info("Current state N_OPS= {}, MAP_SIZE={}, HASH={}",
                         executedOps, data.size(), Hex.encodeHexString(cumulativeHash));
             }
+
             // Check if the operation was issued by me
             Pair<Host, Long> pair = clientIdMapper.remove(not.getOpId());
 
             if (pair != null) {
                 // Generate a response to the client
                 ResponseMessage resp;
-                if (op.getOpType() == RequestMessage.WRITE)
+                if (op.getOpType() == RequestMessage.WRITE) {
                     resp = new ResponseMessage(pair.getRight(), new byte[0]);
-                else
+                } else {
                     resp = new ResponseMessage(pair.getRight(), data.getOrDefault(op.getKey(), new byte[0]));
+                }
                 // Respond
                 sendMessage(resp, pair.getLeft());
             }
