@@ -7,8 +7,8 @@ import pt.unl.fct.di.novasys.network.ISerializer;
 import pt.unl.fct.di.novasys.network.data.Host;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -16,18 +16,18 @@ import java.util.UUID;
  */
 public class JoinReply extends ProtoMessage {
     public final static short MSG_ID = 104;
-    private final HashSet<Host> membership;
+    private final Set<Host> membership;
     private final Pair<Integer, Host> membershipTag;
     private final UUID opID;
 
-    public JoinReply(HashSet<Host> membership, Pair<Integer, Host> membershipTag, UUID opID) {
+    public JoinReply(Set<Host> membership, Pair<Integer, Host> membershipTag, UUID opID) {
         super(MSG_ID);
         this.membership = membership;
         this.membershipTag = membershipTag;
         this.opID = opID;
     }
 
-    public HashSet<Host> getMembership() {
+    public Set<Host> getMembership() {
         return membership;
     }
 
@@ -55,7 +55,7 @@ public class JoinReply extends ProtoMessage {
             }
         }
 
-        private void serializeHashSet(ByteBuf out, HashSet<Host> membership) throws IOException {
+        private void serializeHashSet(ByteBuf out, Set<Host> membership) throws IOException {
             out.writeInt(membership.size());
             for (Host member : membership) {
                 Host.serializer.serialize(member, out);
