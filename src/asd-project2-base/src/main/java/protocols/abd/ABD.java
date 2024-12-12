@@ -781,8 +781,6 @@ public class ABD extends GenericProtocol {
                             }
                         }
                     }
-                    // TODO - must find a way to do this better
-                    // op.getAnswersReadTag().clear();
                 }
             }
         }
