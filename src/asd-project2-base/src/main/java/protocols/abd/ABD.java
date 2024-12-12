@@ -757,9 +757,14 @@ public class ABD extends GenericProtocol {
                     if (op.getAnswersReadReply().size() == (membership.size() + 1) / 2 + 1) {
                         ReadReply msgMax = getMaxReply(op.getAnswersReadReply());
                         if (msgMax.getTag() == null) {
-                            // TODO - Key not found, what to do ?
-                            logger.info("Key not found");
-
+                            // No key was found can return zero byte char to the application
+                            logger.info("[{}] Triggered Read Complete notification", myself);
+                            triggerNotification(new ReadCompleteNotification(
+                                    msg.getKey(),
+                                    new byte[0],
+                                    op.getPending().getLeft())
+                            );
+                            inProgressOperations.remove(new String(msg.getKey()));
                         } else {
                             Pair<Integer, Host> newTag = msgMax.getTag();
                             // Update the current pending value being read
