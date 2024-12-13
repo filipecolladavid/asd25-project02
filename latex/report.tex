@@ -139,7 +139,7 @@ As demonstrated by FLP\cite{FLP} solution, achieving distributed consensus in a 
 \subsection{Babel Framework}
 \label{sec:BabelFramework}
 The Babel framework is a Java-based framework developed in the NOVA LINCS (Nova Laboratory for Computer Science and Informatics)\cite{novaLincs}, designed to simplify the development of distributed, fault-tolerant, high-performance protocols. It abstracts the low-level complexities such as the communication management timeouts, and concurrency, allowing developers to focus on core protocol logic. Babel uses an event-driver model where protocols are implement as independent event-based state machines that process timers, messages and requests, and emit notifications.
-\par In this report, the protocols were implemented using this framework, the nomeclature for the Pseudocode and explanations with be the one used in its respective paper.
+\par In this report, the protocols were implemented using this framework, the nomenclature for the Pseudocode and explanations are in accordance with be the ones used in its respective paper.
 
 \subsection{Multi-Paxos}
 \label{sec:MultiPaxos}
@@ -147,6 +147,45 @@ The Babel framework is a Java-based framework developed in the NOVA LINCS (Nova 
 
 \subsection{ABD}
 \label{sec:ABD}
+In the paper "Sharing Memory Robustly in Message-Passing Systems"\cite{abd} (also known as ABD - H. Attiya, A. Bar-Noy, D. Dolev), the authors explore the implementation of shared memory in message-passing systems, by presenting emulators that translate shared-memory algorithms to message-passing models, implementing wait-free, atomic, single-writer multi-reader registers in unreliable, asynchronous networks. This approach takes advantages of quorum based systems in order to achieve replication of a single register, it does so by ensuring that every write is propagated through the system, and that every read returns the most recent value in the system. 
+\par It's easily adapted to multiple registers, by running several instances of ABD in parallel identified by a key, additionally we can also run instances of ABD to automatically manage the membership of the system.
+\par By changing the original protocol to account for multiple registers and handle membership change, we can achieve a SMR similar to Multi-Paxos(\ref{sec:MultiPaxos}), where membership is automatically managed via a series o mechanisms. These mechanisms will be expanded in the Implementation(\ref{sec:ABDImpl}) section of this report
+
+\section{Implementation}
+\subsection{Multi-Paxos based SMR}
+
+\subsection{ABD based SMR}
+\label{sec:ABDImpl}
+The implementation of state machine replication using quorums is essentially multiple ABD instances running in parallel with different objectives guaranteeing linearizability of each individual key or each membership change in the system. These objectives are defined in our implementation as \textbf{Operations} (Read Write Operation and Membership Operation). This implementation also assumes that the system always starts with three initial replicas (initial membership), but can handle memberships joining afterwards or leaving. Additionally, the system works as intended as long as three replicas remain in it. 
+\subsubsection{Initialization}
+\label{sec:initABD}
+Upon starting, each replica starts initializes it's own state, that consists of:
+\begin{itemize}
+\setlength\itemsep{0em}
+  \item \verb|membership|: Used to maintain the current membership of the system
+  \item \verb|currentlyAlive|, \verb|pendingMembership|: Helper data structures for maintaining the membership of the system. (See \ref{sec:abdmenb}).
+  \item \verb|val|: Holds the key-value map to be replicated.
+  \item \verb|tag|: Holds the tag associated with each key (See \ref{sec:abdrw})
+  \item \verb|inProgressOperations|: An HashMap that holds the operations that are currently in progress at a given instance.
+  \item \verb|pendingOperations|: A Queue that stores operations received by the application, but are yet to be executed.
+\end{itemize}
+\par If a replica integrates the initial membership of the system, it just adds the other replicas to the the membership, becomes automatically ready execute any request made by either the application or other replicas. Otherwise, it joins by requesting to a contact to join the system, then, it has to wait until it's integrated to start participating in the quorum.
+
+\subsubsection{Operations Queues}
+\label{sec:operatioQ}
+The Operation object serves as a wrapper for each individual request. It's defined as an abstract class, implemented by the \verb|ReadWriteOperation| class and the \verb|MembershipOperation| class. The \verb|ReadWriteOperation| class can hold any Read or Write request made by the application, and the \verb|MembershipOperation| class can hold a membership change requested by a replica. When receiving these requests, they are placed in the \verb|pendingOperations| queue. This queue is then accessed upon trigger of a timer that processes the first operation in the queue and execute it's respective request. In order to avoid having multiple operations (in the same replica) executing for the same key, \verb|inProgressOperations| holds the operations that are currently waiting to terminate.
+\par Effectively, we can have has many concurrent Read/Write operations as there are keys, however, to avoid overloading the CPU, we've created a mechanism that limits the amount of concurrent operations.
+
+\subsubsection{Read Write Operations}
+\label{sec:abdrw}
+Read Write operations follow the pseudo code(TODO - link to pseudo code) presented. Once an operation
+
+
+\subsubsection{Membership Managment}
+\label{sec:abdmenb}
+
+
+
 
 
 \bibliography{biblio}
