@@ -9,7 +9,7 @@ import pt.unl.fct.di.novasys.network.data.Host;
 import java.io.IOException;
 
 public class WriteMessage extends ProtoMessage {
-    public final static short MSG_ID = 113;
+    public final static short MSG_ID = 115;
     private final int opSeq;
     private final char[] key;
     private final Pair<Integer, Host> tag;

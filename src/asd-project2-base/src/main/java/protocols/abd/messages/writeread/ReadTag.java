@@ -6,7 +6,7 @@ import pt.unl.fct.di.novasys.network.ISerializer;
 
 public class ReadTag extends ProtoMessage {
 
-    public final static short MSG_ID = 111;
+    public final static short MSG_ID = 113;
     private int opSec;
     private char[] key;
 

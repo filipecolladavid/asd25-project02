@@ -2,9 +2,9 @@ package protocols.abd.timer;
 
 import pt.unl.fct.di.novasys.babel.generic.ProtoTimer;
 
-public class PingTimer extends ProtoTimer {
-    public static final short TIMER_ID = 109;
-    public PingTimer() {
+public class HealthCheckTimer extends ProtoTimer {
+    public static final short TIMER_ID = 101;
+    public HealthCheckTimer() {
         super(TIMER_ID);
     }
 

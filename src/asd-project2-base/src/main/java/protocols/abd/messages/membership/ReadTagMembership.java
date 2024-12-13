@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public class ReadTagMembership extends ProtoMessage {
 
-    public final static short MSG_ID = 105;
+    public final static short MSG_ID = 107;
     private final int opSec;
     private final UUID opID;
 

@@ -10,7 +10,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 public class WriteMessageMembership extends ProtoMessage {
-    public final static short MSG_ID = 107;
+    public final static short MSG_ID = 109;
     private final int opSeq;
     private final Pair<Integer, Host> tag;
     private final Host replica;

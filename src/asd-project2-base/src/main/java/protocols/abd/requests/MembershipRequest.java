@@ -5,7 +5,7 @@ import pt.unl.fct.di.novasys.network.data.Host;
 
 public class MembershipRequest extends ProtoRequest {
 
-    public static final short REQUEST_ID = 103;
+    public static final short REQUEST_ID = 101;
 
     private final Host replica;
 

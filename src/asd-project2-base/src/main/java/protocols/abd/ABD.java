@@ -11,6 +11,7 @@ import protocols.abd.operation.Operation;
 import protocols.abd.operation.ReadWriteOperation;
 import protocols.abd.requests.ReadRequest;
 import protocols.abd.requests.WriteRequest;
+import protocols.abd.timer.HealthCheckTimer;
 import protocols.abd.timer.StartOperationTimer;
 import protocols.abd.requests.MembershipRequest;
 import protocols.abd.notifications.ReadCompleteNotification;
@@ -26,7 +27,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -53,9 +54,9 @@ public class ABD extends GenericProtocol {
     // Interval to execute pending operations
     private static final long RETRY_INTERVAL = 50;
     // Interval to print the current state of the replica  - for debugging.
-    private static final long STATUS_LOG = 1000;
+    private static final long STATUS_LOG = 10000;
     // Interval for HEALTH_CHECK - if a replica needs to be removed.
-    private static final long HEALTH_CHECK = 500;
+    private static final long HEALTH_CHECK = 15000;
 
     private int channelID;
 
@@ -71,6 +72,9 @@ public class ABD extends GenericProtocol {
     // Equivalent to tag in ABD
     private Pair <Integer, Host> membershipTag;
     private Boolean ready;
+    private Boolean inMembershipOperation;
+    private Boolean heathCheckComplete;
+    private Boolean isLeader;
 
     /**
      * State Replicated
@@ -86,7 +90,7 @@ public class ABD extends GenericProtocol {
     // Maps the keys of the operations that are currently being processed
     private ConcurrentHashMap<String, Operation> inProgressOperations;
     // Holds the pending operations that have yet to be executed
-    private ConcurrentLinkedQueue<Pair<String, Operation>> pendingOperations;
+    private ConcurrentLinkedDeque<Pair<String, Operation>> pendingOperations;
 
     // Unique Sequence number of operation of this process
     private AtomicInteger opSeq;
@@ -111,6 +115,8 @@ public class ABD extends GenericProtocol {
         /*------------------------------ Register Timer Handlers -------------------------------------------- */
         registerTimerHandler(StartOperationTimer.TIMER_ID, this::uponStartOperation);
         setupPeriodicTimer(new StartOperationTimer(), RETRY_INTERVAL, RETRY_INTERVAL);
+        registerTimerHandler(HealthCheckTimer.TIMER_ID, this::uponStartHealthCheck);
+        setupPeriodicTimer(new HealthCheckTimer(), HEALTH_CHECK, HEALTH_CHECK);
         /*--------------------------------------------------------------------------------------------------- */
 
         /*------------------------------ Register Request Handlers ------------------------------------------ */
@@ -119,6 +125,9 @@ public class ABD extends GenericProtocol {
         /*--------------------------------------------------------------------------------------------------- */
 
         /*------------------------------ Register Message Message Serializers -------------------------------- */
+        registerMessageSerializer(channelID, Ping.MSG_ID, Ping.serializer);
+        registerMessageSerializer(channelID, Pong.MSG_ID, Pong.serializer);
+
         registerMessageSerializer(channelID, JoinMessage.MSG_ID, JoinMessage.serializer);
         registerMessageSerializer(channelID, ReadTagMembership.MSG_ID, ReadTagMembership.serializer);
         registerMessageSerializer(channelID, ReadTagReplyMembership.MSG_ID, ReadTagReplyMembership.serializer);
@@ -137,6 +146,8 @@ public class ABD extends GenericProtocol {
 
         /*------------------------------ Register Message Message Handlers ----------------------------------- */
         try {
+            registerMessageHandler(channelID, Ping.MSG_ID, this::uponPingMessage, this::uponMsgFail);
+            registerMessageHandler(channelID, Pong.MSG_ID, this::uponPongMessage, this::uponMsgFail);
             registerMessageHandler(channelID, JoinMessage.MSG_ID, this::uponJoinMessage, this::uponMsgFail);
             registerMessageHandler(channelID, ReadTagMembership.MSG_ID, this::uponReadTagMembership, this::uponMsgFail);
             registerMessageHandler(channelID, ReadTagReplyMembership.MSG_ID, this::uponReadTagReplyMembership, this::uponMsgFail);
@@ -157,12 +168,36 @@ public class ABD extends GenericProtocol {
         /*--------------------------------------------------------------------------------------------------- */
     }
 
-    public synchronized void setReady(boolean isReady) {
+    // Synchronized for shared thread states.
+
+    private synchronized void setReady(boolean isReady) {
         this.ready = isReady;
     }
 
-    public synchronized boolean isReady() {
+    private synchronized boolean isReady() {
         return this.ready;
+    }
+
+    private synchronized boolean isMembershipOperation() { return this.inMembershipOperation; }
+
+    private synchronized void setIsMembershipOperation(boolean isMembershipOperation) {
+        this.inMembershipOperation = isMembershipOperation;
+    }
+
+    private synchronized boolean inHealthCheck() {
+        return this.heathCheckComplete;
+    }
+
+    private synchronized void setIsHealthCheckComplete(boolean inHealthCheck) {
+        this.heathCheckComplete = inHealthCheck;
+    }
+
+    private synchronized void setIsLeader(boolean isLeader) {
+        this.isLeader = isLeader;
+    }
+
+    private synchronized boolean isLeader() {
+        return this.isLeader;
     }
 
     private synchronized void updateTagAndValue(String key, Pair<Integer, Host> newTag, byte[] data) {
@@ -200,11 +235,15 @@ public class ABD extends GenericProtocol {
         tag = new ConcurrentHashMap<>();
         val = new ConcurrentHashMap<>();
         inProgressOperations = new ConcurrentHashMap<>();
-        pendingOperations = new ConcurrentLinkedQueue<>();
+        pendingOperations = new ConcurrentLinkedDeque<>();
+        setIsMembershipOperation(false);
+        setIsHealthCheckComplete(false);
+        setIsLeader(false);
 
         // Initial membership
         if(props.getProperty("contact") == null) {
             String[] membershipStr = props.getProperty("initial_membership").split(",");
+            int i = 0;
             for (String s : membershipStr) {
                 String ipAdr = s.split(":")[0];
                 int p = Integer.parseInt(s.split(":")[1]);
@@ -213,6 +252,11 @@ public class ABD extends GenericProtocol {
                     membership.add(h);
                     currentlyAlive.add(h);
                 }
+                // If it's the first one
+                else if (i == 0) {
+                    setIsLeader(true);
+                }
+                i++;
             }
             membershipTag = Pair.of(0, myself);
             setReady(true);
@@ -246,6 +290,7 @@ public class ABD extends GenericProtocol {
 
     /**
      * Upon receiving a join request from another replica
+     * Membership operations always go the front
      *
      * @param msg to join
      * @param host to add to quorum
@@ -253,7 +298,7 @@ public class ABD extends GenericProtocol {
      * @param channelId used to communicate
      */
     private void uponJoinMessage(JoinMessage msg, Host host, short sourceProto, int channelId) {
-        logger.info("{} is trying to join the system", msg.getMyself());
+        logger.info("[{}] {} is trying to join the system", myself, msg.getMyself());
         // Used to know the operation
         UUID uuid = UUID.randomUUID();
         Operation op = new MembershipOperation(new MembershipRequest(
@@ -263,7 +308,7 @@ public class ABD extends GenericProtocol {
                 msg.getMyself(),
                 Action.JOIN
         );
-        pendingOperations.add(Pair.of(uuid.toString(), op));
+        pendingOperations.addFirst(Pair.of(uuid.toString(), op));
     }
 
     /**
@@ -295,33 +340,41 @@ public class ABD extends GenericProtocol {
     }
 
     /**
-     *
+     * Starts healthcheck (Runs only on leader)
      *
      * @param protoTimer
      * @param l
      */
     private void uponStartHealthCheck(ProtoTimer protoTimer, long l) {
         if(isReady()) {
-            Set<Host> missingElements = new HashSet<>(membership);
-            missingElements.removeAll(currentlyAlive);
-
-            if (!missingElements.isEmpty()) {
-                for(Host host : missingElements) {
-                    logger.info("[{}] {} is not responding", myself, host);
-                    // Used to know the operation
-                    UUID uuid = UUID.randomUUID();
-                    Operation op = new MembershipOperation(new MembershipRequest(
-                            host),
-                            opSeq.incrementAndGet(),
-                            uuid,
-                            host,
-                            Action.REMOVE
-                    );
-                    startOperation(Pair.of(op.getOpSeq(), op));
-                    currentlyAlive.clear();
+            if (!isMembershipOperation() && !inHealthCheck()) {
+                Set<Host> missingElements = new HashSet<>(membership);
+                missingElements.removeAll(currentlyAlive);
+                logger.info("[{}] Starting Health Check", myself);
+                if (!missingElements.isEmpty()) {
+                    for (Host host : missingElements) {
+                        logger.info("[{}] {} is not responding", myself, host);
+                        // Used to know the operation
+                        UUID uuid = UUID.randomUUID();
+                        Operation op = new MembershipOperation(new MembershipRequest(
+                                host),
+                                opSeq.incrementAndGet(),
+                                uuid,
+                                host,
+                                Action.REMOVE
+                        );
+                        pendingOperations.addFirst(Pair.of(uuid.toString(), op));
+                    }
+                } else {
+                    // TODO - replace by reliable broadcast
+                    Ping ping = new Ping();
+                    for (Host host : membership) {
+                        openConnection(host);
+                        sendMessage(ping, host);
+                    }
                 }
+                currentlyAlive.clear();
             }
-
         }
         // Try to rejoin
         else {
@@ -330,21 +383,43 @@ public class ABD extends GenericProtocol {
                 openConnection(contact);
                 sendMessage(new JoinMessage(myself), contact);
             }
-
         }
     }
 
     /**
+     * When receiving a ping message for health check
+     */
+    private void uponPingMessage(Ping msg, Host host, short sourceProto, int channelId) {
+        openConnection(host);
+        sendMessage(new Pong(), host);
+
+    }
+
+    /**
+     * When receiving a ping message for healthCheck.
+     */
+    private void uponPongMessage(Pong msg, Host host, short sourceProto, int channelId) {
+        currentlyAlive.add(host);
+    }
+
+
+
+
+    /**
      * Timer used to execute queued operations
+     * Membership operations only start after there are no inProgressOperations (can't stop them).
+     * Once a membership operation is in progress, other pending operations are blocked.
      *
      * @param protoTimer timer
      */
     private void uponStartOperation(ProtoTimer protoTimer, long l) {
         if (isReady()) {
-            if (!pendingOperations.isEmpty()) {
+            if (!pendingOperations.isEmpty() && !isMembershipOperation()) {
+                // Remove right away the pending operation (not the best idea)
                 Pair<String, Operation> p = pendingOperations.poll();
                 String key = p.getLeft();
                 Operation op = p.getRight();
+
                 if(!inProgressOperations.containsKey(key)) {
                     if (inProgressOperations.size() <= MAX_CONCURRENT_OPERATIONS) {
                         logger.info("[{}] Inserted key {} for request {} on inProgressOperations Map",
@@ -354,7 +429,7 @@ public class ABD extends GenericProtocol {
                         );
                         inProgressOperations.put(key, op);
                         int seqNum = opSeq.get();
-                        startOperation(Pair.of(seqNum, op));
+                        startOperation(Pair.of(seqNum, op), key);
 
                     } else {
                         logger.info("[{}] Maximum concurrent operations reached", myself);
@@ -366,17 +441,33 @@ public class ABD extends GenericProtocol {
         }
     }
 
+    private synchronized void waitOtherOperations(String key) {
+        // Probably could get away with just checking the size. (Sorry complexity)
+        while (!(inProgressOperations.containsKey(key) && inProgressOperations.size() == 1)) {
+            try {
+                wait(); // Wait until notified that inProgressOperations is empty
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); // Restore the interrupted status
+                throw new RuntimeException("Operation interrupted", e);
+            }
+        }
+    }
+
+
     /**
      * Used to parse the current pending operation.
+     * Membership operations only start if all inProgress operations are done.
      *
      * @param request
      */
-    private synchronized void startOperation(Pair<Integer, Operation> request) {
+    private synchronized void startOperation(Pair<Integer, Operation> request, String key) {
         if (request.getRight().getRequest() instanceof WriteRequest) {
             startWriteOperation((ReadWriteOperation) request.getRight(), request.getLeft());
         } else if (request.getRight().getRequest() instanceof ReadRequest) {
             startReadOperation((ReadWriteOperation) request.getRight(), request.getLeft());
         } else if (request.getRight().getRequest() instanceof MembershipRequest) {
+            setIsMembershipOperation(true);
+            waitOtherOperations(key);
             startMembershipOperation((MembershipOperation) request.getRight(), request.getLeft());
         }
         else {
@@ -663,6 +754,7 @@ public class ABD extends GenericProtocol {
 
         this.membership = msg.getMembership();
         this.membershipTag = msg.getMembershipTag();
+        this.currentlyAlive.addAll(this.membership);
 
         JoinnedMessage jm = new JoinnedMessage(opSeq.get(), msg.getOpID());
 
@@ -685,6 +777,7 @@ public class ABD extends GenericProtocol {
         inProgressOperations.remove(msg.getOpID().toString());
         pendingMembership.remove(host);
         membership.add(host);
+        currentlyAlive.add(host);
     }
 
     /**
@@ -700,9 +793,9 @@ public class ABD extends GenericProtocol {
                 if (msg.getOpSeq() == op.getOpSeq()) {
                     op.getAnswersAck().add(host);
                     if (op.getAnswersAck().size() == (membership.size()+1)/2 + 1) {
-                        logger.info("[{}] Sending state to new replica", myself);
                         switch (msg.getAction()) {
                             case JOIN:
+                                logger.info("[{}] Sending state to new replica", myself);
                                 pendingMembership.add(op.getPending().getRight());
                                 // Membership still doesn't have new replica
                                 JoinReply jr = new JoinReply(this.membership, membershipTag, msg.getOpID());
@@ -711,8 +804,15 @@ public class ABD extends GenericProtocol {
                                 break;
 
                             case REMOVE:
+                                logger.info("[{}] Remove replica", myself);
                                 membership.remove(op.getPending().getRight());
                                 break;
+                        }
+                        synchronized (this) {
+                            inProgressOperations.remove(msg.getOpID().toString());
+                            setIsHealthCheckComplete(true);
+                            setIsMembershipOperation(false);
+                            notifyAll(); // Wake up threads waiting for operations to complete
                         }
                     }
                 }
@@ -744,7 +844,6 @@ public class ABD extends GenericProtocol {
                                     msg.getKey(),
                                     val.get(new String(msg.getKey())))
                             );
-                            inProgressOperations.remove(new String(msg.getKey()));
                         } else {
                             logger.info("[{}] Triggered Read Complete notification", myself);
                             triggerNotification(new ReadCompleteNotification(
@@ -752,9 +851,12 @@ public class ABD extends GenericProtocol {
                                     op.getPending().getRight(),
                                     op.getPending().getLeft())
                             );
-                            inProgressOperations.remove(new String(msg.getKey()));
                         }
-                        // TODO - must find a better way to do this
+                        synchronized (this) {
+                            inProgressOperations.remove(new String(msg.getKey()));
+                            notifyAll(); // Wake up threads waiting for operations to complete
+                        }
+                        // TODO - must find a better way to do this - after a timeout - future work (commit phases)
                         // pendingOperations.poll();
                     }
                 }

@@ -5,7 +5,7 @@ import pt.unl.fct.di.novasys.babel.generic.ProtoRequest;
 import java.util.UUID;
 
 public class ReadRequest extends ProtoRequest {
-    public static final short REQUEST_ID = 104;
+    public static final short REQUEST_ID = 103;
 
     private final UUID opId;
     private final char[] key;

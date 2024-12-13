@@ -5,7 +5,7 @@ import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
 import pt.unl.fct.di.novasys.network.ISerializer;
 
 public class Ack extends ProtoMessage {
-    public final static short MSG_ID = 108;
+    public final static short MSG_ID = 110;
     private final int opSeq;
     private final char[] key;
 

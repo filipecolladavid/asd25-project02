@@ -10,7 +10,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 public class ReadTagReplyMembership extends ProtoMessage {
-    public final static short MSG_ID = 106;
+    public final static short MSG_ID = 108;
     private final Pair<Integer, Host> tag;
     private final UUID peerOpID;
     public ReadTagReplyMembership(Pair<Integer, Host> tag, UUID peerOpID) {

@@ -9,7 +9,7 @@ import pt.unl.fct.di.novasys.network.data.Host;
 import java.io.IOException;
 
 public class ReadTagReply extends ProtoMessage {
-    public final static short MSG_ID = 112;
+    public final static short MSG_ID = 114;
     private final Pair<Integer, Host> tag;
     private final int peerOpID;
     private final char[] key;

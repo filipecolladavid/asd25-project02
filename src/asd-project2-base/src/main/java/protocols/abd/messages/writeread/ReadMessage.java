@@ -7,7 +7,7 @@ import pt.unl.fct.di.novasys.network.ISerializer;
 import java.io.IOException;
 
 public class ReadMessage extends ProtoMessage {
-    public final static short MSG_ID = 109;
+    public final static short MSG_ID = 111;
     private final int opSeq;
     private final char[] key;
 
