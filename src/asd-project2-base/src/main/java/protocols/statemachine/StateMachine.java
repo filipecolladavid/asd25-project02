@@ -14,7 +14,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Queue;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -33,6 +35,7 @@ import protocols.statemachine.requests.OrderRequest;
 import pt.unl.fct.di.novasys.babel.core.GenericProtocol;
 import pt.unl.fct.di.novasys.babel.exceptions.HandlerRegistrationException;
 import pt.unl.fct.di.novasys.babel.generic.ProtoMessage;
+import pt.unl.fct.di.novasys.babel.generic.ProtoTimer;
 import pt.unl.fct.di.novasys.channel.tcp.TCPChannel;
 import pt.unl.fct.di.novasys.channel.tcp.events.InConnectionDown;
 import pt.unl.fct.di.novasys.channel.tcp.events.InConnectionUp;
@@ -45,6 +48,8 @@ public class StateMachine extends GenericProtocol {
     public static final String PROTOCOL_NAME = "StateMachine";
     public static final short PROTOCOL_ID = 200;
 
+    // private static final int EXECUTION_INTERVAL = 50;
+
     private static final Logger logger = LogManager.getLogger(StateMachine.class);
 
     /* Membership States */
@@ -56,6 +61,7 @@ public class StateMachine extends GenericProtocol {
     /* Operation States */
     private boolean readyOperationInstance;
     private int nextOperationInstance;
+    private Queue<Map.Entry<UUID, Object>> pendingOperations;
     private HashSet<UUID> decidedOperations;
 
     /* Network State */
@@ -74,6 +80,8 @@ public class StateMachine extends GenericProtocol {
 
         this.readyOperationInstance = false;
         this.decidedOperations = new HashSet<UUID>();
+        this.pendingOperations = new ConcurrentLinkedQueue<>();
+
         this.nextOperationInstance = 0;
 
         this.applicationState = new HashMap<>();
@@ -87,9 +95,6 @@ public class StateMachine extends GenericProtocol {
         Properties channelProps = new Properties();
         channelProps.setProperty(TCPChannel.ADDRESS_KEY, address);
         channelProps.setProperty(TCPChannel.PORT_KEY, port);
-        channelProps.setProperty(TCPChannel.HEARTBEAT_INTERVAL_KEY, "1000");
-        channelProps.setProperty(TCPChannel.HEARTBEAT_TOLERANCE_KEY, "5000");
-        channelProps.setProperty(TCPChannel.CONNECT_TIMEOUT_KEY, "2000");
         channelID = createChannel(TCPChannel.NAME, channelProps);
 
         /* Init Message Handlers */
@@ -116,6 +121,11 @@ public class StateMachine extends GenericProtocol {
         registerChannelEventHandler(channelID, InConnectionUp.EVENT_ID, this::uponInConnectionUp);
         registerChannelEventHandler(channelID, InConnectionDown.EVENT_ID,
                 this::uponInConnectionDown);
+
+        // registerTimerHandler(ExecutionPendingOperationTimer.TIMER_ID,
+        // this::uponExecutePendingOperation);
+        // setupPeriodicTimer(new ExecutionPendingOperationTimer(), EXECUTION_INTERVAL,
+        // EXECUTION_INTERVAL);
     }
 
     @Override
@@ -158,6 +168,9 @@ public class StateMachine extends GenericProtocol {
             return;
         }
 
+        // this.pendingOperations.offer(new
+        // AbstractMap.SimpleEntry<>(msg.getOperationId(), msg));
+
         JoinRequest newJoinRequest = new JoinRequest(this.nextOperationInstance++, msg.getOperationId(),
                 msg.getRequester());
         sendRequest(newJoinRequest, Agreement.PROTOCOL_ID);
@@ -178,11 +191,14 @@ public class StateMachine extends GenericProtocol {
         if (!this.isLeader) {
             sendMessage(msg, this.currentLeader);
             return;
-        } else {
-            ProposeRequest proposeRequest = new ProposeRequest(msg.getInstanceNumber(),
-                    msg.getOperationId(), msg.getOperation());
-            sendRequest(proposeRequest, Agreement.PROTOCOL_ID);
         }
+
+        ProposeRequest proposeRequest = new ProposeRequest(msg.getInstanceNumber(),
+                msg.getOperationId(), msg.getOperation());
+        sendRequest(proposeRequest, Agreement.PROTOCOL_ID);
+
+        // this.pendingOperations.offer(new
+        // AbstractMap.SimpleEntry<>(msg.getOperationId(), msg));
     }
 
     /* Receive a new State Transfer Message after being accepted */
@@ -260,35 +276,42 @@ public class StateMachine extends GenericProtocol {
 
     /* Execute Operation and Send Notification */
     private void executeOperation(UUID operationId, byte[] payload) {
+        logger.info("Executing operation {}", operationId);
+
         if (payload == null)
             return;
 
-        try {
-            String opStr = new String(payload);
-            String[] opParts = opStr.split(",");
-            if (opParts.length >= 2) {
-                if (opParts.length >= 3) {
-                    String key = opParts[1];
-                    String value = opParts[2];
-                    this.applicationState.put(key, value.getBytes());
-                    logger.info("Self:[{}] Executed PUT {}={}", self, key, value);
-                    ExecuteNotification executedNotification = new ExecuteNotification(operationId,
-                            payload);
-                    triggerNotification(executedNotification);
-                } else {
-                    byte[] value = this.applicationState.get(opParts[1]);
-                    logger.info("Self:[{}] Executed GET {} = {}", self, opParts[1],
-                            value != null ? new String(value) : "null");
-                    ExecuteNotification executedNotification = new ExecuteNotification(operationId,
-                            payload);
-                    triggerNotification(executedNotification);
+        ExecuteNotification executedNotification = new ExecuteNotification(operationId, payload);
+        triggerNotification(executedNotification);
+    }
+
+    /* Execute Operation from Pending Operations */
+    private void uponExecutePendingOperation(ProtoTimer timer, long timerId) {
+        if (this.pendingOperations.isEmpty()) {
+            logger.debug("No pending operations to execute");
+            return;
+        }
+
+        Map.Entry<UUID, Object> entry;
+        while ((entry = pendingOperations.poll()) != null) {
+            UUID operationId = entry.getKey();
+            Object operation = entry.getValue();
+
+            try {
+                if (operation instanceof OperationMessage) {
+                    OperationMessage opMsg = (OperationMessage) operation;
+                    ProposeRequest proposeRequest = new ProposeRequest(this.nextOperationInstance++,
+                            operationId, opMsg.getOperation());
+                    sendRequest(proposeRequest, Agreement.PROTOCOL_ID);
+                } else if (operation instanceof JoinMessage) {
+                    JoinMessage joinMsg = (JoinMessage) operation;
+                    JoinRequest joinRequest = new JoinRequest(this.nextOperationInstance++,
+                            operationId, joinMsg.getRequester());
+                    sendRequest(joinRequest, Agreement.PROTOCOL_ID);
                 }
-            } else {
-                logger.warn("Self:[{}] Invalid operation format: {}", self, opStr);
+            } catch (Exception e) {
+                logger.error("Error executing operation {}: {}", operationId, e.getMessage());
             }
-        } catch (Exception e) {
-            logger.error("Self:[{}] Error executing operation: {}", self, e);
-            e.printStackTrace();
         }
     }
 

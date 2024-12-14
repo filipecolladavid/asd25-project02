@@ -121,6 +121,7 @@ public class Agreement extends GenericProtocol {
         PaxosInstance paxosInstance = new PaxosInstance(request.getOperationId(), 1,
                 this.membership,
                 PaxosInstance.InstanceType.REGULAR);
+
         paxosInstance
                 .setProposedValue(new ProposedValue(ProposedValue.OperationType.REGULAR, null, request.getOperation()));
         this.listOfProposes.put(request.getOperationId(), paxosInstance);
@@ -128,6 +129,7 @@ public class Agreement extends GenericProtocol {
         PreparePaxosMessage preparePaxosMessage = new PreparePaxosMessage(paxosInstance.getId(),
                 paxosInstance.getBallot(),
                 request.getOperationId(), PreparePaxosMessage.OperationType.REGULAR);
+
         for (Host host : this.membership) {
             this.openConnection(host);
             sendMessage(preparePaxosMessage, host);
@@ -251,6 +253,7 @@ public class Agreement extends GenericProtocol {
     /* Receive Prepare Paxos Messages */
     public void uponPreparePaxosMessage(PreparePaxosMessage msg, Host host, short sourceProto, int channelId) {
         PaxosInstance paxosInstance = this.listOfProposes.get(msg.getOperationID());
+
         int ballot = msg.getBallot();
         OperationType operationType = msg.getOperationType();
 
