@@ -143,6 +143,13 @@ The Babel framework is a Java-based framework developed in the NOVA LINCS (Nova 
 
 \subsection{Multi-Paxos}
 \label{sec:MultiPaxos}
+In the paper "Paxos Made Simple"(implicitly describing Multi-Paxos as an optimization), Leslie Lamport explores how to optimize the Paxos consensus protocol for practical state machine replication. The protocol became widely recognized after its implementation by major companies like Google, and has since become a cornerstone for building fault-tolerant distributed systems, being particularly efficient for maintaining consistent state across multiple replicas.
+
+The key insight of Multi-Paxos is that in a sequence of consensus decisions, such as in state machine replication, it's inefficient to run the complete Paxos protocol for each decision. Instead, after a leader is elected, subsequent consensus decisions can skip the prepare phase, reducing the message exchanges from 4 to 2 rounds. This optimization proves especially valuable in geo-distributed settings where network latency is significant.
+
+The protocol divides consensus into ordered slots, where each slot represents one decision in the sequence. While a leader remains stable, it can propose values directly for consecutive slots using only the accept phase of Paxos. If the leader fails or becomes unreachable, a new leader is elected through a complete Paxos instance, ensuring all previously accepted values are preserved before resuming normal operation.
+
+Multi-Paxos can be enhanced to handle membership changes automatically by treating them as special values that must be agreed upon through the consensus sequence. The protocol ensures that membership changes are totally ordered with respect to other operations, maintaining consistency even as the set of participating replicas evolves. These mechanics will be detailed in the Implementation(3.1) section of this report.
 
 
 \subsection{ABD}
@@ -153,6 +160,7 @@ In the paper "Sharing Memory Robustly in Message-Passing Systems"\cite{abd} (als
 
 \section{Implementation}
 \subsection{Multi-Paxos based SMR}
+
 
 \subsection{ABD based SMR}
 \label{sec:ABDImpl}
