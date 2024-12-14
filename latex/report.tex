@@ -164,7 +164,7 @@ In the paper "Sharing Memory Robustly in Message-Passing Systems"\cite{abd} (als
 
 \subsection{ABD based SMR}
 \label{sec:ABDImpl}
-The implementation of state machine replication using quorums is essentially multiple ABD instances running in parallel with different objectives guaranteeing linearizability of each individual key or each membership change in the system. These objectives are defined in our implementation as \textbf{Operations} (Read Write Operation and Membership Operation). This implementation also assumes that the system always starts with three initial replicas (initial membership), but can handle memberships joining afterwards or leaving. Additionally, the system works as intended as long as three replicas remain in it. 
+The implementation of state machine replication using quorums is essentially multiple ABD instances running in parallel with different objectives guaranteeing serialisability of each individual key or each membership change in the system. These objectives are defined in our implementation as \textbf{Operations} (Read Write Operation and Membership Operation). This implementation also assumes that the system always starts with three initial replicas (initial membership), but can handle memberships joining afterwards or leaving. Additionally, the system works as intended as long as three replicas remain in it. 
 \subsubsection{Initialization}
 \label{sec:initABD}
 Upon starting, each replica starts initializes it's own state, that consists of:
@@ -202,10 +202,233 @@ The Membership Management consists of either a replica joining or leaving the sy
 
 
 
+\appendix
+\onecolumn
+\section{ABD-based SMR}
+\begin{algorithm}
+  \caption{Key-Value Store Replication Using Majority Quorums (State \& Init)}
+  \begin{algorithmic}
+  \State \textbf{Interface:}
+  \State \hspace{1em} \textbf{Requests:}
+  \State \hspace{2em} \texttt{write}(k, v) {where $k$ is the key, $v$ is the value}
+  \State \hspace{2em} \texttt{read} {where $k$ is the key}
+  \State \hspace{1em} \textbf{Indications:}
+  \State \hspace{2em} \texttt{writeOK}(k)
+  \State \hspace{2em} \texttt{readOK}(k, v)
+  \State
+  \State \textbf{State:}
+  \State \hspace{1em} $replicas$ {set containing all replicas}
+  \State \hspace{1em} $myself$ {unique index of this replica}
+  \State \hspace{1em} $tag$ {set with timestamps - pair (sequenceNumb, process) - per keys}
+  \State \hspace{1em} $val$ {set of values for every key $k$, initially $\perp$}
+  \State \hspace{1em} $opSeq$ {unique sequence number for operations at this process}
+  \State \hspace{1em} $answers$ {set containing reply messages}
+  \State \hspace{1em} $pending$ {pending value to be written}
+  \State
+  \State \textbf{Upon Init() do:}
+  \State \hspace{1em} \textbf{If} \textsc{isInitialMembership()}:
+  \State \hspace{3em} $replicas \leftarrow \Pi$
+  \State \hspace{1em} \textbf{Else}:
+  \State \hspace{3em} $replicas \leftarrow \bot$
+  \State \hspace{1em} $myself \leftarrow \texttt{mySequence}(\text{replicas})$
+  \State \hspace{1em} $tag \leftarrow \{\}$
+  \State \hspace{1em} $val \leftarrow \{\}$
+  \State \hspace{1em} $opSeq \leftarrow 0$
+  \State \hspace{1em} $pending \leftarrow \perp$
+  \end{algorithmic}
+  \end{algorithm}
+
+  \appendix
+  \begin{algorithm}
+    \caption{Key-Value Store Replication Using Majority Quorums (Write \& Read)}
+    \begin{algorithmic}
+    
+    \State \textbf{Upon write}(k, v) \textbf{do}:
+    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+    \State \hspace{3em} $pending \leftarrow v$
+    \State \hspace{3em} $opSeq \leftarrow opSeq + 1$
+    \State \hspace{3em} $answers \leftarrow \{\}$
+    \State \hspace{3em} Trigger bebBcastSend($\langle$READ-TAG, $opSeq$, $k$$\rangle$)
+    \State
+
+    \State \textbf{Upon bebBcastDeliver(READ-TAG, $id$, $k$ $\rangle$, $p$) do:}
+    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+    \State \hspace{3em} \textbf{Send}(\textsc{Read-Tag-Reply}, $p$, $id$, $tag[k]$)
+    \State
+
+    \State \textbf{Upon Receive($\langle$ READ-TAG-REPLY, $id$, $tag$$\rangle$, $p$ ) do:}
+    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+    \State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
+    \State \hspace{5em} $answers \leftarrow answers \cup \{\langle$ \textsc{Read-Tag-Reply}, $id$, $tag$ $\rangle\}$
+    \State \hspace{5em} \textbf{If} $|answers| = \frac{\#\Pi+1}{2} + 1$ \textbf{Then}
+    \State \hspace{6em} $new\text{-}tag \leftarrow$ \texttt{maxSQTag}($answers$)
+    \State \hspace{6em} $opSeq \leftarrow opSeq + 1$
+    \State \hspace{6em} $answers \leftarrow \{\}$
+    \State \hspace{6em} \textbf{Trigger} bebBcastSend($\langle$ \textsc{Write}, $opSeq$, $k$, $\langle new\text{-}tag + 1$, $myself \rangle$, $pending$ $\rangle$)
+    \State \hspace{6em} $pending \leftarrow \perp$
+    \State
+    
+    \State \textbf{Upon bebBcastDeliver($\langle$ WRITE, $id$, $k$, $new\text{-}tag$, $v$ $\rangle$, $p$) do:}
+    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+    \State \hspace{3em} \textbf{If} $new\text{-}tag > tag[k]$ \textbf{Then}
+    \State \hspace{5em} $tag[k] \leftarrow new\text{-}tag$
+    \State \hspace{5em} $val[k] \leftarrow v$
+    \State \hspace{3em} \textbf{Send}(\textsc{Ack}, $p$, $id$, $k$)
+    \State
+    
+    \State \textbf{Upon Receive(\textsc{Ack}, $p$, $id$, $k$) do:}
+    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+    \State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
+    \State \hspace{4em} $answers \leftarrow answers \cup \{\langle$ \textsc{Ack}, $id$ $\rangle\}$
+    \State \hspace{4em} \textbf{If} $|answers| = \frac{N+1}{2} + 1$ \textbf{Then}
+    \State \hspace{5em} $answers \leftarrow \{\}$
+    \State \hspace{5em} \textbf{If} $pending = \perp$ \textbf{Then}
+    \State \hspace{6em} \textbf{Trigger WriteOK}($k$)
+    \State \hspace{5em} \textbf{Else:}
+    \State \hspace{6em} \textbf{Trigger ReadOK}($k$, \textbf{$pending$})
+    \State
+
+    \State \textbf{Upon read}($k$) \textbf{do}:
+    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+    \State \hspace{3em} $opSeq \leftarrow opSeq + 1$
+    \State \hspace{3em} $answers \leftarrow \{\}$
+    \State \hspace{3em} \textbf{Trigger} bebBcastSend($\langle$\textsc{Read}, $opSeq$, $k$$\rangle$)
+    \State
+
+    \State \textbf{Upon bebBcastDeliver ($\langle$\textsc{Read}, $id$, $k$$\rangle$, $p$) do:}
+    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+    \State \hspace{3em} \textbf{Send}(\textsc{Read-Reply}, $p$, $id$, $k$, $tag[k]$, $val[k]$)
+    \State
+
+    \State \textbf{Upon Receive($\langle$\textsc{Read-Reply}, $id$, $k$, $tag$, $v$$\rangle$, $p$) do:}
+    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+    \State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
+    \State \hspace{4em} $answers \leftarrow answers \cup \{\langle$\textsc{Read-Reply}, $id$, $k$, $tag$, $v$$\rangle\}$
+    \State \hspace{4em} \textbf{If} $|answers| = \frac{\#\Pi}{2} + 1$ \textbf{Then}
+    \State \hspace{5em} $tag \leftarrow$ \texttt{maxTag}($answers$)
+    \State \hspace{5em} $pending \leftarrow$ \texttt{valueOfMaxTag}($answers$)
+    \State \hspace{5em} $opSeq \leftarrow opSeq + 1$
+    \State \hspace{5em} $answers \leftarrow \{\}$
+    \State \hspace{5em} \textbf{Trigger} bebBcastSend($\langle$\textsc{Write}, $opSeq$, $k$, $tag$, $pending$$\rangle$)
+    \end{algorithmic}
+  \end{algorithm}
+  
+\begin{algorithm}
+    \caption{Membership Management - State, Init() \& Timer}
+    \begin{algorithmic}
+        \State \textbf{Interface:}
+        \State \hspace{1em} \textbf{Requests:}
+        \State \hspace{2em} \texttt{ChangeMembership}( $r$ , ACTION) //{where $r$ is the replica identifier and ACTION = \{ADD, REMOVE\}}
+        \State
+        \State \textbf{State:}
+        \State \hspace{1em} $replicas$ {set containing all replicas}
+        \State \hspace{1em} $currentlyAlive$ {set containing replicas currently active between timers}
+        \State \hspace{1em} $pendingMembership$ {replica waiting to join }
+        \State \hspace{1em} $myself$ {unique index of this replica}
+        \State \hspace{1em} $membershipTag$ {set with timestamps - pair (sequenceNumb, process)}
+        \State \hspace{1em} $opSeq$ {unique sequence number for operations at this process}
+        \State \hspace{1em} $answers$ {set containing reply messages}
+        \State \hspace{1em} $pending$ {pending value to be written}
+        \State \hspace{1em} $T$ {period between healthchecks}
+        \State
+
+        \State \textbf{Upon Init() do:}
+        \State \hspace{1em} \textbf{If} \textsc{isInitialMembership()}:
+        \State \hspace{3em} $replicas \leftarrow \Pi$
+        \State \hspace{1em} \textbf{Else}:
+        \State \hspace{3em} $replicas \leftarrow \bot$
+        \State \hspace{1em} $currentlyAlive \leftarrow replicas$
+        \State \hspace{1em} $myself \leftarrow \texttt{mySequence}(\text{replicas})$
+        \State \hspace{1em} $tag \leftarrow \{\}$
+        \State \hspace{1em} $val \leftarrow \{\}$
+        \State \hspace{1em} $opSeq \leftarrow 0$
+        \State \hspace{1em} $pending \leftarrow \perp$
+        \State \hspace{1em} \textbf{Setup Periodic Timer} HealthCheck($T$)
+        \State
+
+        \State \textbf{Upon Timer } HealthCheck \textbf{ do:}
+        \State \hspace{1em} \textbf{If} $\#replicas \neq \#currentlyAlive$ \textbf{Then}
+        \State \hspace{3em} \textbf{Trigger} bebBcastSend(READ-TAG-MEMBERSHIP, $currentlyAlive, \langle opSeq, REMOVE\rangle$)
+        \State \hspace{1em} \textbf{Else}
+        \State \hspace{3em} \textbf{Trigger} bebBcastSend(Ping, $replicas$)
+        \State \hspace{1em} $currentlyAlive \leftarrow \{\}$
+        \State
+
+        \State \textbf{Upon Ping}($p$) \textbf{do:}
+        \State \hspace{3em} \textbf{Send}(Pong, $p$)
+        \State
+        
+
+        \State \textbf{Upon Pong}($p$) \textbf{do:}
+        \State \hspace{3em} $currentlyAlive \leftarrow currentlyAlive \cup p$
+        \State
+    \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+    \caption{Membership Management - Join \& Remove}
+    \begin{algorithmic}        
+        \State \textbf{Upon ChangeMembership}(r, ADD) \textbf{do:}
+        \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+        \State \hspace{3em} $pending \leftarrow r$
+        \State \hspace{3em} $pendingMembership \leftarrow r$
+        \State \hspace{3em} $opSeq \leftarrow opSeq + 1$
+        \State \hspace{3em} $answers \leftarrow \{\}$
+        \State \hspace{3em} Trigger bebBcastSend(READ-TAG-MEMBERSHIP, $replicas, \langle opSeq, ADD\rangle$)
+        \State
+
+        \State \textbf{Upon bebBcastDeliver(READ-TAG-MEMBERSHIP, $id$, ACTION$\rangle$, $p$) do:}
+        \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+        \State \hspace{3em} \textbf{Send}(\textsc{Read-Tag-Reply-Membership}, $p$ $\langle id, membershipTag, ACTION\rangle$)
+        \State
+
+        \State \textbf{Upon Receive($\langle$ READ-TAG-REPLY-MEMBERSHIP, $id$, $membershipTag$$, ACTION\rangle$, $p$) do:}
+        \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+        \State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
+        \State \hspace{4em} $answers \leftarrow answers \cup \{\langle$ \textsc{Read-Tag-Reply-Membership}, $id$, $tag$ $\rangle\}$
+        \State \hspace{4em} \textbf{If} $|answers| = \frac{\#\Pi+1}{2} + 1$ \textbf{Then}
+        \State \hspace{5em} $new\text{-}tag \leftarrow$ \texttt{maxSQTag}($answers$)
+        \State \hspace{5em} $opSeq \leftarrow opSeq + 1$
+        \State \hspace{5em} $answers \leftarrow \{\}$
+        \State \hspace{5em} \textbf{Trigger} bebBcastSend(\textsc{WriteMembership}, $replicas \langle, opSeq$, $\langle new\text{-}tag + 1$, $myself \rangle$, $pending$, ACTION$\rangle$)
+        \State \hspace{5em} $pending \leftarrow \perp$
+        \State
+
+        \State \textbf{Upon bebBcastDeliver($\langle$ WRITEMEMBERSHIP, $id$, $new\text{-}tag$, $r$, ACTION $\rangle$, $p$) do:}
+        \State \hspace{1em} \textbf{If} $new\text{-}tag > tag$ \textbf{Then}
+        \State \hspace{2em} \textbf{If} $ACTION = ADD$ \textbf{Then}
+        \State \hspace{3em} $membershipTag \leftarrow new\text{-}tag$
+        \State \hspace{3em} $pendingMembership \leftarrow r$
+        \State \hspace{2em} \textbf{Else}
+        \State \hspace{3em} $replicas \leftarrow replicas \setminus \{pendingMembership\}$
+        \State \hspace{1em} \textbf{Send}($\langle$ \textsc{MembershipAck}, $p$, $id$ $\rangle$)
+        \State
+
+        \State \textbf{Upon Receive($\langle$ \textsc{MembershipAck}, $p$, $id$, ACTION $\rangle$) do:}
+        \State \hspace{1em} \textbf{If} $opSeq = id$ \textbf{Then}
+        \State \hspace{2em} $answers \leftarrow answers \cup \{\langle$ \textsc{Ack}, $id$ $\rangle\}$
+        \State \hspace{2em} \textbf{If} $|answers| = \frac{N+1}{2} + 1$ \textbf{Then}
+        \State \hspace{3em} $answers \leftarrow \{\}$
+        \State \hspace{3em} \textbf{If} $pending = \perp$ \textbf{Then}
+        \State \hspace{4em} \textbf{If} $ACTION = ADD$ \textbf{Then}
+        \State \hspace{5em} \textbf{Send}($\langle$\textsc{JoinReply}, $pendingMembership$, $membershipTag$, $replicas$ $\rangle$)
+        \State \hspace{4em} \textbf{Else}
+        \State \hspace{5em} $replicas \leftarrow replicas \setminus \{pendingMembership\}$
+        \State
+
+        \State \textbf{Upon Receive($\langle$ \textsc{JoinReply}, $p$, $membershipTagReceived$, $replicasReceived$ $\rangle$) do:}
+        \State \hspace{1em} $replicas \leftarrow replicasReceived$
+        \State \hspace{1em} $membershipTag \leftarrow membershipTagReceived$
+        \State \hspace{1em} \textbf{Trigger} bebBcastSend(\textsc{Joined}, $replicas, myself$)
+        \State
+
+        \State \textbf{Upon bebBcastDeliver($ \textsc{Joined}, p$) do:}
+        \State \hspace{1em} $replicas \leftarrow replicas \cup \{p\}$
+        \State \hspace{1em} $pendingMembership \leftarrow \bot$
 
 
-
-\bibliography{biblio}
-\bibliographystyle{abbrv}
+    \end{algorithmic}
+\end{algorithm}
+  
 
 \end{document}
