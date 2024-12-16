@@ -23,6 +23,7 @@ import org.apache.logging.log4j.Logger;
 
 import protocols.agreement.Agreement;
 import protocols.agreement.notifications.DecidedNotification;
+import protocols.agreement.notifications.LeaderDecidedNotification;
 import protocols.agreement.notifications.NodeDecidedNotification;
 import protocols.agreement.requests.JoinRequest;
 import protocols.agreement.requests.ProposeRequest;
@@ -110,6 +111,7 @@ public class StateMachine extends GenericProtocol {
         /* Init Notification Handlers */
         subscribeNotification(NodeDecidedNotification.NOTIFICATION_ID, this::uponNodeDecidedNotification);
         subscribeNotification(DecidedNotification.NOTIFICATION_ID, this::uponDecidedNotification);
+        subscribeNotification(LeaderDecidedNotification.NOTIFICATION_ID, this::uponLeaderDecidedNotification);
 
         /* Init Request Handlers */
         registerRequestHandler(OrderRequest.REQUEST_ID, this::uponOrderRequest);
@@ -246,6 +248,18 @@ public class StateMachine extends GenericProtocol {
             if (operationPayload != null && operationPayload.length > 0) {
                 executeOperation(notification.getOperationId(), operationPayload);
             }
+        }
+    }
+
+    public void uponLeaderDecidedNotification(LeaderDecidedNotification notification, short sourceProto) {
+        Host newLeader = notification.getNewLeaderHost();
+        this.currentLeader = newLeader;
+        this.isLeader = newLeader.equals(self);
+
+        if (isLeader) {
+            this.readyOperationInstance = true;
+        } else {
+            openConnection(this.currentLeader);
         }
     }
 

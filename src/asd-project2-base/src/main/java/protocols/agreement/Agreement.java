@@ -13,15 +13,19 @@ import org.apache.logging.log4j.Logger;
 
 import protocols.agreement.messages.AcceptPaxosMessage;
 import protocols.agreement.messages.DecidedMessage;
+import protocols.agreement.messages.HeartbeatMessage;
 import protocols.agreement.messages.LearnPaxosMessage;
 import protocols.agreement.messages.NewNodeMessage;
 import protocols.agreement.messages.PreparePaxosMessage;
 import protocols.agreement.messages.PromisePaxosMessage;
 import protocols.agreement.messages.PreparePaxosMessage.OperationType;
 import protocols.agreement.notifications.DecidedNotification;
+import protocols.agreement.notifications.LeaderDecidedNotification;
 import protocols.agreement.notifications.NodeDecidedNotification;
 import protocols.agreement.requests.JoinRequest;
 import protocols.agreement.requests.ProposeRequest;
+import protocols.agreement.timers.HeartbeatTimer;
+import protocols.agreement.timers.LeaderTimer;
 import protocols.statemachine.messages.JoinMessage;
 import protocols.statemachine.messages.OperationMessage;
 import protocols.statemachine.notifications.ChannelReadyNotification;
@@ -39,6 +43,11 @@ public class Agreement extends GenericProtocol {
     public final static short PROTOCOL_ID = 100;
     public final static String PROTOCOL_NAME = "Agreement";
     private static final Logger logger = LogManager.getLogger(Agreement.class);
+
+    /* Leader Election State */
+    public static final short HEARTBEAT_MSG_ID = 105;
+    public static final long LEADER_TIMEOUT = 5000;
+    private boolean receivedHeartbeat;
 
     /* Membership State */
     private final Host self;
@@ -77,6 +86,9 @@ public class Agreement extends GenericProtocol {
 
         /* Init Subscribers */
         subscribeNotification(ChannelReadyNotification.NOTIFICATION_ID, this::uponChannelCreated);
+
+        registerTimerHandler(LeaderTimer.TIMER_ID, this::uponLeaderTimeout);
+        registerTimerHandler(HeartbeatTimer.TIMER_ID, this::uponHeartbeatTimeout);
     }
 
     @Override
@@ -92,10 +104,13 @@ public class Agreement extends GenericProtocol {
             if (leaderHost.equals(self)) {
                 this.isLeader = true;
                 this.currentLeader = self;
+                setupPeriodicTimer(new HeartbeatTimer(), LEADER_TIMEOUT / 2, LEADER_TIMEOUT / 2);
+
             } else {
                 this.isLeader = false;
                 this.currentLeader = leaderHost;
                 initialMembership.add(self);
+                setupPeriodicTimer(new LeaderTimer(), LEADER_TIMEOUT, LEADER_TIMEOUT);
             }
             this.membership = new LinkedList<>(initialMembership);
         } catch (UnknownHostException e) {
@@ -219,6 +234,8 @@ public class Agreement extends GenericProtocol {
                     this::uponNewNodeMessage);
             registerMessageHandler(this.channelId, DecidedMessage.MESSAGE_ID,
                     this::uponDecidedMessage);
+            registerMessageHandler(this.channelId, HeartbeatMessage.MESSAGE_ID,
+                    this::uponHeartbeatMessage);
 
             /* Register Message Serailizers */
             registerMessageSerializer(this.channelId, PreparePaxosMessage.MESSAGE_ID,
@@ -233,6 +250,8 @@ public class Agreement extends GenericProtocol {
                     NewNodeMessage.serializer);
             registerMessageSerializer(this.channelId, DecidedMessage.MESSAGE_ID,
                     DecidedMessage.serializer);
+            registerMessageSerializer(this.channelId, HeartbeatMessage.MESSAGE_ID,
+                    HeartbeatMessage.serializer);
 
             /* Register Channel Events */
             registerChannelEventHandler(this.channelId, OutConnectionDown.EVENT_ID, this::uponOutConnectionDown);
@@ -361,14 +380,27 @@ public class Agreement extends GenericProtocol {
 
         paxosInstance.setAccept(host, true);
         if (hasQuorum(paxosInstance.getAccepts())) {
+            if (proposedValue != null && proposedValue.getType() == ProposedValue.OperationType.LEADER_ELECTION) {
+                Host newLeader = proposedValue.getHost();
+                this.currentLeader = newLeader;
+                this.isLeader = newLeader.equals(self);
+                notifyLeaderDecisionToStateMachine(operationId, newLeader);
+
+                if (isLeader) {
+                    setupPeriodicTimer(new HeartbeatTimer(), LEADER_TIMEOUT / 2, LEADER_TIMEOUT / 2);
+                }
+            }
+
             if (proposedValue != null && proposedValue.getType() == ProposedValue.OperationType.JOIN) {
-                Host joiningNode = proposedValue.getJoiningNode();
+                Host joiningNode = proposedValue.getHost();
                 if (joiningNode != null && !this.membership.contains(joiningNode)) {
                     this.membership.add(joiningNode);
                     notifyJoinDecisionToStateMachine(operationId, joiningNode);
                 }
             }
+
             cleanProposes(operationId);
+
             if (!this.isLeader) {
                 return;
             }
@@ -409,6 +441,53 @@ public class Agreement extends GenericProtocol {
         triggerNotification(notification);
     }
 
+    public void uponHeartbeatMessage(HeartbeatMessage msg, Host host, short sourceProto, int channelId) {
+        if (host.equals(currentLeader)) {
+            receivedHeartbeat = true;
+        }
+    }
+
+    public void uponLeaderTimeout(LeaderTimer timer, long timerId) {
+        if (!this.isLeader && !receivedHeartbeat) {
+            startLeaderElection();
+        }
+        receivedHeartbeat = false;
+    }
+
+    public void uponHeartbeatTimeout(HeartbeatTimer timer, long timerId) {
+        if (isLeader) {
+            HeartbeatMessage heartbeatMessage = new HeartbeatMessage();
+            for (Host host : this.membership) {
+                if (!host.equals(self)) {
+                    this.openConnection(host);
+                    sendMessage(heartbeatMessage, host);
+                }
+            }
+        }
+    }
+
+    private void startLeaderElection() {
+        UUID electionOperationId = UUID.randomUUID();
+
+        PaxosInstance paxosInstance = new PaxosInstance(electionOperationId, 1, this.membership,
+                PaxosInstance.InstanceType.REGULAR);
+
+        paxosInstance.setProposedValue(new ProposedValue(ProposedValue.OperationType.LEADER_ELECTION, self, null));
+
+        this.listOfProposes.put(electionOperationId, paxosInstance);
+
+        PreparePaxosMessage preparePaxosMessage = new PreparePaxosMessage(electionOperationId,
+                paxosInstance.getBallot(),
+                electionOperationId, PreparePaxosMessage.OperationType.LEADER_ELECTION);
+
+        for (Host host : this.membership) {
+            if (!host.equals(self)) {
+                this.openConnection(host);
+                sendMessage(preparePaxosMessage, host);
+            }
+        }
+    }
+
     public void uponMsgFail(ProtoMessage msg, Host host, short destProto,
             Throwable throwable, int channelId) {
         logger.info("Message {} to {} failed, reason: {}", msg, host, throwable);
@@ -447,6 +526,14 @@ public class Agreement extends GenericProtocol {
                 0,
                 null);
         triggerNotification(nodeDecidedNotification);
+    }
+
+    private void notifyLeaderDecisionToStateMachine(UUID operationId, Host newLeader) {
+        LeaderDecidedNotification leaderDecidedNotification = new LeaderDecidedNotification(operationId,
+                LeaderDecidedNotification.DecisionType.COMMIT,
+                this.membership,
+                newLeader);
+        triggerNotification(leaderDecidedNotification);
     }
 
     public boolean hasQuorum(HashMap<Host, Boolean> promises) {

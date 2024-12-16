@@ -9,7 +9,8 @@ import pt.unl.fct.di.novasys.network.ISerializer;
 public class PreparePaxosMessage extends ProtoMessage {
     public enum OperationType {
         REGULAR,
-        JOIN
+        JOIN,
+        LEADER_ELECTION
     }
 
     public static final short MESSAGE_ID = 101;

@@ -5,16 +5,17 @@ import pt.unl.fct.di.novasys.network.data.Host;
 class ProposedValue {
     public enum OperationType {
         REGULAR,
-        JOIN
+        JOIN,
+        LEADER_ELECTION
     }
 
     private final OperationType type;
-    private Host joiningNode;
+    private Host host;
     private byte[] value;
 
-    public ProposedValue(OperationType type, Host joiningNode, byte[] value) {
+    public ProposedValue(OperationType type, Host host, byte[] value) {
         this.type = type;
-        this.joiningNode = joiningNode;
+        this.host = host;
         this.value = value;
     }
 
@@ -22,8 +23,8 @@ class ProposedValue {
         return type;
     }
 
-    public Host getJoiningNode() {
-        return joiningNode;
+    public Host getHost() {
+        return host;
     }
 
     public byte[] getValue() {
@@ -34,7 +35,7 @@ class ProposedValue {
         this.value = value;
     }
 
-    public void setJoiningNode(Host joiningNode) {
-        this.joiningNode = joiningNode;
+    public void setHost(Host host) {
+        this.host = host;
     }
 }
