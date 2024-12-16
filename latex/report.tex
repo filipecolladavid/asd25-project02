@@ -160,6 +160,211 @@ In the paper "Sharing Memory Robustly in Message-Passing Systems"\cite{abd} (als
 
 \section{Implementation}
 \subsection{Multi-Paxos based SMR}
+The implementation consists of two main components: a \textbf{State Machine Replication (SMR)} protocol and an \textbf{Agreement} protocol based on Multi-Paxos.
+The SMR protocol manages the replicated key-value store state and receives operation requests from HashApp or operation messages from other nodes, while the Agreement protocol ensures consistent ordering of operations across replicas through consensus.
+The system assumes that before reaching a minimum quorum (3 replicas), the first node will be the leader and any new node join request will be immediately decided by the leader without running consensus. After reaching the minimum quorum size, the SMR protocol relies on the leader to order operations, which are then committed through Multi-Paxos consensus to ensure all replicas execute operations in the same order.
+A heartbeat mechanism is used to detect leader failures, triggering leader election when necessary through the Agreement protocol.
+
+\subsubsection{Leader Election}
+The leader election mechanism in our Multi-Paxos implementation is built around a heartbeat-based failure detection system. The protocol maintains two main timers: a leader monitoring timer that runs on follower nodes and a heartbeat sending timer that runs on the leader node.
+
+Leader nodes are configured to send heartbeat messages every \texttt{LEADER\_TIMEOUT/2} milliseconds (where \texttt{LEADER\_TIMEOUT} is set to 5000ms in the implementation). This is done through a periodic timer that triggers a heartbeat message to be sent to all other replicas in the membership:
+
+\begin{algorithm}[H]
+\begin{algorithmic}
+\If{isLeader}
+    \State heartbeatMessage $\leftarrow$ new HeartbeatMessage()
+    \ForAll{host $\in$ membership}
+        \If{!host.equals(self)}
+            \State sendMessage(heartbeatMessage, host)
+        \EndIf
+    \EndFor
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+Follower nodes maintain a boolean flag \texttt{receivedHeartbeat} that is set to true whenever they receive a heartbeat message from the current leader. A periodic timer running every \texttt{LEADER\_TIMEOUT} milliseconds checks this flag. If no heartbeat was received during this period, the follower initiates a leader election by starting a new instance of Paxos consensus with a special leader election operation:
+
+\begin{algorithm}[H]
+\begin{algorithmic}
+\If{!isLeader \textbf{ and } !receivedHeartbeat}
+    \State startLeaderElection()
+    \State // Create new Paxos instance for leader election
+    \State // Propose self as the new leader
+\EndIf
+\State receivedHeartbeat $\leftarrow$ false
+\end{algorithmic}
+\end{algorithm}
+
+The leader election itself is conducted through a complete Paxos instance, where the proposed value is the identity of the new leader. This ensures all replicas agree on the new leader even in the presence of multiple concurrent leader elections. 
+
+When the Agreement protocol completes the Paxos consensus for leader election, each node's Agreement protocol will notify its local SMR protocol through a \texttt{LeaderDecidedNotification}. This notification triggers the following state changes in the SMR protocol:
+
+\begin{itemize}
+\item If the local node is the new leader, sets its \texttt{isLeader} flag to true and starts the heartbeat timer
+\item Updates its \texttt{currentLeader} reference
+\item If not the leader, establishes a connection to the new leader
+\end{itemize}
+
+By using Paxos consensus for leader election, the system ensures that even with multiple nodes detecting leader failure simultaneously and proposing themselves as leaders, only one leader will be elected and acknowledged by all functioning replicas in the system.
+
+\subsubsection{Membership Management}
+The membership management in our implementation is responsible for handling new nodes joining the system and maintaining a consistent view of the active replicas across all nodes. The system maintains a \texttt{LinkedList<Host>} to track current members, where each \texttt{Host} represents a replica's network address and port.
+
+When a new node wants to join the system, it sends a join request to its contact node. The behavior for processing this request varies depending on whether the system has reached minimum quorum (3 replicas):
+
+Before minimum quorum:
+\begin{itemize}
+\item The leader can immediately accept new nodes without running consensus
+\item The leader updates its membership list and sends a \texttt{StateTransferMessage} to the joining node
+\item The joining node becomes ready to participate after processing the \texttt{StateTransferMessage}
+\end{itemize}
+
+After minimum quorum:
+\begin{itemize}
+\item The contact node forwards the join request to the current leader
+\item The leader creates a special join operation and initiates a Paxos instance
+\item Upon consensus completion, the leader sends a \texttt{StateTransferMessage} to the joining node
+\item The joining node becomes ready to participate after processing the \texttt{StateTransferMessage}
+\end{itemize}
+
+The \texttt{StateTransferMessage} contains the current membership list and the system state. When a node receives this message, it updates its local state and becomes ready to participate in the system:
+
+\begin{algorithm}[H]
+\begin{algorithmic}
+\Upon{ReceivedStateTransferMessage(msg, host)}
+   \If{!msg.getLeader().equals(self)}
+       \State this.membership $\leftarrow$ msg.getMembership()
+       \State this.applicationState $\leftarrow$ deserializeState(msg.getState())
+       \State this.readyOperationInstance $\leftarrow$ true
+   \EndIf
+\EndUpon
+\end{algorithmic}
+\end{algorithm}
+
+Each membership change is treated as a special operation that must be processed before any subsequent operations can be executed, ensuring consistency in the membership view across all replicas.
+
+
+\subsubsection{Consensus Implementation}
+The consensus implementation in our Multi-Paxos based system is handled by the Agreement protocol, which ensures all replicas agree on the ordering and execution of operations. The protocol follows the standard Multi-Paxos flow but incorporates special handling for both regular operations and membership changes.
+The core consensus logic is implemented through several key phases:
+\begin{itemize}
+\item \textbf{Prepare Phase}: When a proposer wants to propose a value, it first sends a PrepareMessage with a ballot number to all acceptors. The implementation handles this through the \texttt{uponPreparePaxosMessage} handler:
+\begin{algorithm}[H]
+\begin{algorithmic}
+\If{ballot >= paxosInstance.getBallot()}
+\State paxosInstance.setBallot(ballot)
+\State paxosInstance.setPromise(host, true)
+\State // Send Promise message back to proposer
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+\item \textbf{Promise Phase}: Acceptors respond to prepare messages with promises, tracked in the \texttt{uponPromisePaxosMessage} handler. Once a quorum of promises is received, the proposer can move to the accept phase:
+\begin{algorithm}[H]
+\begin{algorithmic}
+\If{hasQuorum(paxosInstance.getPromises())}
+\State AcceptPaxosMessage acceptMsg = new AcceptPaxosMessage(
+\State \hspace{1em}paxosInstance.getId(),
+\State \hspace{1em}paxosInstance.getBallot(),
+\State \hspace{1em}msg.getOperationID())
+\State // Send Accept message to all replicas
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+\item \textbf{Accept Phase}: The proposer sends accept messages with the proposed value. Acceptors validate the ballot number and respond with learn messages if they accept the proposal.
+\item \textbf{Learn Phase}: Once a quorum of learn messages is received, the value is considered decided. The Agreement protocol notifies the SMR through specific notifications:
+\begin{itemize}
+\item \texttt{DecidedNotification}: For regular operations
+\item \texttt{NodeDecidedNotification}: For membership changes
+\item \texttt{LeaderDecidedNotification}: For leader changes
+\end{itemize}
+\end{itemize}
+The implementation maintains all necessary state for each Paxos instance in a \texttt{PaxosInstance} class, which tracks:
+\begin{itemize}
+\item Ballot numbers
+\item Promise and accept quorums
+\item Instance type (REGULAR, JOIN, or LEADERELECTION)
+\item Proposed values
+\end{itemize}
+When the Agreement protocol reaches consensus on an operation, it triggers the appropriate notification to the SMR protocol, which then executes the operation and updates its state.
+
+
+\subsubsection{Operation Processing}
+Operation processing in our Multi-Paxos based system begins when HashApp generates operation requests. These requests follow different paths depending on whether they are received by a leader or non-leader replica.
+When a replica receives an OrderRequest from HashApp, it first checks if it's ready to process operations and if the operation hasn't been previously decided:
+\begin{algorithm}[H]
+\begin{algorithmic}
+\If{!readyOperationInstance}
+\State return
+\EndIf
+\If{decidedOperations.contains(request.getOpId())}
+\State return
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+If the replica is not the leader, it forwards the operation to the current leader via an OperationMessage:
+\begin{algorithm}[H]
+\begin{algorithmic}
+\If{!isLeader}
+\State OperationMessage msg = new OperationMessage(
+\State \hspace{1em}request.getOpId(), self,
+\State \hspace{1em}nextOperationInstance++,
+\State \hspace{1em}request.getOperation())
+\State openConnection(currentLeader)
+\State sendMessage(msg, currentLeader)
+\State return
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+If the replica is the leader, it proposes the operation through the Agreement protocol:
+\begin{algorithm}[H]
+\begin{algorithmic}
+\State ProposeRequest proposeRequest = new ProposeRequest(
+\State \hspace{1em}nextOperationInstance++,
+\State \hspace{1em}request.getOpId(),
+\State \hspace{1em}request.getOperation())
+\State sendRequest(proposeRequest, Agreement.PROTOCOLID)
+\end{algorithmic}
+\end{algorithm}
+When an operation is decided, the Agreement protocol notifies the SMR through a DecidedNotification. Upon receiving this notification, the SMR:
+
+Verifies the operation hasn't been already decided
+Increments the next operation instance number
+Updates its membership list
+Executes the operation if there is payload
+Records the operation as decided
+
+In case of leadership changes, operations in progress may need to be restarted under the new leader. The system ensures safety by tracking decided operations to prevent duplicate execution.
+
+\subsubsection{Limitation and Future Work}
+Our current implementation, while functional, has several areas for potential improvement:
+\textbf{Operation Recovery After Leadership Change}
+Currently, when a new leader is elected, pending operations at the old leader are lost. A more robust implementation would include a mechanism to transfer pending operations to the new leader. This could be achieved by having replicas resend their pending operations to the new leader after receiving a LeaderDecidedNotification.
+\textbf{Automatic Failure Detection and Cleanup}
+While our implementation handles leader failure through the heartbeat mechanism, it lacks automatic cleanup of crashed replicas from the membership. Implementing this would require:
+\begin{itemize}
+\item A failure detection mechanism similar to the leader heartbeat
+\item A consensus round to remove failed replicas
+\item State cleanup for removed replicas
+\end{itemize}
+\textbf{Operation Processing Optimization}
+Our current implementation handles operation requests and their execution in the same thread/context - when a request arrives, the handler both processes the request and, if appropriate, executes the propose operation immediately. We attempted to separate these concerns by having request handlers only validate the request and add it to a pendingOperations queue, with a separate periodic timer responsible for processing this queue and executing the propose operations. However, this approach resulted in significant performance degradation compared to the immediate execution model, leading us to maintain the coupled implementation. The cause of this performance issue with the decoupled approach warrants further investigation.
+\textbf{Code and Data Structure Optimization}
+The current implementation has several redundant data structures and classes that could be consolidated:
+\begin{itemize}
+\item Merge similar message types (PaxosMessage variants)
+\item Unify notification structures across protocols
+\item Reduce code duplication in message handlers
+\item Simplify state tracking across Agreement and SMR protocols
+\end{itemize}
+\textbf{Additional Improvements}
+Several other enhancements could be made to the system:
+\begin{itemize}
+\item Implement state transfer optimization to reduce the cost of bringing new replicas up-to-date
+\item Add mechanisms to prevent unbounded growth of operation history
+\item Implement snapshotting for faster recovery
+\item Optimize the communication patterns between replicas
+\end{itemize}
 
 
 \subsection{ABD based SMR}
