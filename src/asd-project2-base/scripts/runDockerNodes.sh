@@ -37,7 +37,7 @@ ssh $swarmManager "docker network create $net -d overlay --attachable --subnet 1
 
 s=0
 
-for i in $(seq 1 $nNodes) 
+for i in $(seq 1 $nNodes)
 do
 	name=asd-$i
 	ip=${ips[$i-1]}
@@ -46,7 +46,7 @@ do
 	if [ ! -d ${resultsDir}/${name} ]; then
 	  mkdir ${resultsDir}/${name} && echo "created ${resultsDir}/${name}"
 	fi
-	
+
 	echo "ssh $server \"docker run --rm -d -t --cpus=$cpu --privileged -v $jarDir:/home/asd/$4 -v $resultsDir/$name:/home/asd/logs -v /lib/modules:/lib/modules --cap-add=ALL --net $net --ip $ip --name $name --hostname $name $image $i $bandwidth\""
 	ssh $server "docker run --rm -d -t --cpus=$cpu --privileged -v $jarDir:/home/asd/$4 -v $resultsDir/$name:/home/asd/logs -v /lib/modules:/lib/modules --cap-add=ALL --net $net --ip $ip --name $name --hostname $name $image $i $bandwidth"
 

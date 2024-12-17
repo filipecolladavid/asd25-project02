@@ -192,14 +192,6 @@ public class ABD extends GenericProtocol {
         this.heathCheckComplete = inHealthCheck;
     }
 
-    private synchronized void setIsLeader(boolean isLeader) {
-        this.isLeader = isLeader;
-    }
-
-    private synchronized boolean isLeader() {
-        return this.isLeader;
-    }
-
     private synchronized void updateTagAndValue(String key, Pair<Integer, Host> newTag, byte[] data) {
         tag.put(key, newTag);
         val.put(key, data);
@@ -210,6 +202,7 @@ public class ABD extends GenericProtocol {
         Properties channelProps = new Properties();
 
         int port = Integer.parseInt(props.getProperty("p2p_port"));
+        String address = props.getProperty("address");
 
         // Creating TCP channel
         channelProps.setProperty(TCPChannel.ADDRESS_KEY, props.getProperty("address"));
@@ -238,29 +231,23 @@ public class ABD extends GenericProtocol {
         pendingOperations = new ConcurrentLinkedDeque<>();
         setIsMembershipOperation(false);
         setIsHealthCheckComplete(false);
-        setIsLeader(false);
 
         // Initial membership
         if(props.getProperty("contact") == null) {
             String[] membershipStr = props.getProperty("initial_membership").split(",");
-            int i = 0;
             for (String s : membershipStr) {
                 String ipAdr = s.split(":")[0];
                 int p = Integer.parseInt(s.split(":")[1]);
-                if (p != port) {
+                if (!ipAdr.equals(address) && p != port) {
                     Host h = new Host(InetAddress.getByName(ipAdr), p);
                     membership.add(h);
                     currentlyAlive.add(h);
                 }
-                // If it's the first one
-                else if (i == 0) {
-                    setIsLeader(true);
-                }
-                i++;
             }
             membershipTag = Pair.of(0, myself);
             setReady(true);
             logger.info("[{}] is Ready!", myself);
+            logger.info("[{}] membership size: {}", myself, membership.size());
         } else {
             // Request to join
             String c = props.getProperty("contact");
@@ -376,7 +363,6 @@ public class ABD extends GenericProtocol {
                 currentlyAlive.clear();
             }
         }
-        // Try to rejoin
         else {
             if (!membership.isEmpty()) {
                 Host contact = membership.iterator().next();
@@ -402,9 +388,6 @@ public class ABD extends GenericProtocol {
         currentlyAlive.add(host);
     }
 
-
-
-
     /**
      * Timer used to execute queued operations
      * Membership operations only start after there are no inProgressOperations (can't stop them).
@@ -415,7 +398,6 @@ public class ABD extends GenericProtocol {
     private void uponStartOperation(ProtoTimer protoTimer, long l) {
         if (isReady()) {
             if (!pendingOperations.isEmpty() && !isMembershipOperation()) {
-                // Remove right away the pending operation (not the best idea)
                 Pair<String, Operation> p = pendingOperations.poll();
                 String key = p.getLeft();
                 Operation op = p.getRight();
@@ -442,7 +424,6 @@ public class ABD extends GenericProtocol {
     }
 
     private synchronized void waitOtherOperations(String key) {
-        // Probably could get away with just checking the size. (Sorry complexity)
         while (!(inProgressOperations.containsKey(key) && inProgressOperations.size() == 1)) {
             try {
                 wait(); // Wait until notified that inProgressOperations is empty

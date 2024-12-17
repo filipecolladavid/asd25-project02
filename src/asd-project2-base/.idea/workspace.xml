@@ -5,28 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bbd271cc-03a1-46af-af09-82ee4c71629d" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/membership/AckMembership.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/membership/Action.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/membership/JoinnedMessage.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/membership/ReadTagReplyMembership.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/membership/WriteMessageMembership.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/client/client.log" beforeDir="false" afterPath="$PROJECT_DIR$/client/client.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/client/config.properties" beforeDir="false" afterPath="$PROJECT_DIR$/client/config.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/runDockerNodes.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/runDockerNodes.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/stopDockerNodes.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/stopDockerNodes.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/ABD.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/ABD.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/Ack.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/writeread/Ack.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/JoinMessage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/membership/JoinMessage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/JoinReply.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/membership/JoinReply.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadMessage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/writeread/ReadMessage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadReply.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/writeread/ReadReply.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadTag.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/writeread/ReadTag.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadTagMembership.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/membership/ReadTagMembership.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/ReadTagReply.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/writeread/ReadTagReply.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/WriteMessage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/messages/writeread/WriteMessage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/operation/MembershipOperation.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/operation/MembershipOperation.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/operation/Operation.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/operation/Operation.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/operation/ReadWriteOperation.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/operation/ReadWriteOperation.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/AddReplicaRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/protocols/abd/requests/AddReplicaRequest.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -134,6 +116,7 @@
       <workItem from="1733830347759" duration="1036000" />
       <workItem from="1733832189898" duration="6881000" />
       <workItem from="1733913604873" duration="17972000" />
+      <workItem from="1734435638852" duration="1819000" />
     </task>
     <servers />
   </component>
