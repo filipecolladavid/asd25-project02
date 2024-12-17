@@ -3,7 +3,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import protocols.agreement.Agreement;
-// import protocols.abd.ABD;
+import protocols.abd.ABD;
 import protocols.app.HashApp;
 import protocols.app.HashApp.ReplicationStrategy;
 import protocols.statemachine.StateMachine;
@@ -48,36 +48,29 @@ public class Main {
         // Application
         HashApp hashApp = new HashApp(props);
         StateMachine sm = null;
-        // ABD abd = null;
+        ABD abd = null;
         Agreement agreement = null;
 
         // Register applications in babel
         babel.registerProtocol(hashApp);
 
+        hashApp.init(props);
+
         if (hashApp.getReplicationStrategy() == ReplicationStrategy.SMR) {
             System.err.println("Loading SMR/Paxos protocol stack");
 
-            // StateMachine Protocol
             sm = new StateMachine(props);
-            // Agreement Protocol
             agreement = new Agreement(props);
             babel.registerProtocol(sm);
             babel.registerProtocol(agreement);
-        } else {
-            System.err.println("Loading ABD protocol stack");
 
-            // abd = new ABD(props);
-            // babel.registerProtocol(abd);
-        }
-
-        // Init the protocols. This should be done after creating all protocols,
-        // since there can be inter-protocol communications in this step.
-        hashApp.init(props);
-        if (hashApp.getReplicationStrategy() == ReplicationStrategy.SMR) {
             sm.init(props);
             agreement.init(props);
         } else {
-            // abd.init(props);
+            System.err.println("Loading ABD protocol stack");
+			abd = new ABD(props);
+			babel.registerProtocol(abd);
+            abd.init(props);
         }
 
         // Start babel and protocol threads
