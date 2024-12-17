@@ -57,3 +57,41 @@
    2. ```./runDockerNodes.sh <EXPERIMENTNAME> <NumberNodes> {HOSTS} <ProgramLocation>```
 6. Run the ```bash ./runJavaNodes.sh abdResults 3 "{kadabra-06,kadabra-07,kadabra-08}" abd```
    1. ```bash ./runJavaNodes <ResultsFolder> <NumberNodes> {HOSTS} <ProgramLocation>```
+
+## Current state
+1. Application is stuck on Initializing<br>
+2. Need to create a docker image to run the client<br>
+3. I think that we can use asd-1, asd-2 and asd-3 (name of the containers) as addresses<br>
+4. Pings to other containers work
+```bash
+asd-1:/home/asd/abd/logs# tail -f * 
+==> node34000.log <==
+I[15:16:36,495] [main]HashApp: Listening on 127.0.0.1:35000
+D[15:16:36,773] [ServerChannel-1-1]SimpleServerChannel: Server socket ready
+D[15:16:36,780] [TCPChannel-5-1]TCPChannel: Server socket ready
+I[15:16:36,790] [main]ABD: [127.0.0.1:34000] Initializing ABD
+
+==> node34001.log <==
+I[15:16:36,980] [main]HashApp: Listening on 127.0.0.1:35001
+D[15:16:37,262] [ServerChannel-1-1]SimpleServerChannel: Server socket ready
+D[15:16:37,271] [TCPChannel-5-1]TCPChannel: Server socket ready
+I[15:16:37,281] [main]ABD: [127.0.0.1:34001] Initializing ABD
+
+==> node34002.log <==
+I[15:16:37,279] [main]HashApp: Listening on 127.0.0.1:35002
+D[15:16:37,562] [ServerChannel-1-1]SimpleServerChannel: Server socket ready
+D[15:16:37,568] [TCPChannel-5-1]TCPChannel: Server socket ready
+I[15:16:37,578] [main]ABD: [127.0.0.1:34002] Initializing ABD
+```
+
+```bash
+asd-1:/home/asd/abd/logs# ping asd-2
+PING asd-2 (10.10.199.38): 56 data bytes
+64 bytes from 10.10.199.38: seq=0 ttl=64 time=6.720 ms
+64 bytes from 10.10.199.38: seq=1 ttl=64 time=6.736 ms
+64 bytes from 10.10.199.38: seq=2 ttl=64 time=6.557 ms
+64 bytes from 10.10.199.38: seq=3 ttl=64 time=6.557 ms
+64 bytes from 10.10.199.38: seq=4 ttl=64 time=6.578 ms
+64 bytes from 10.10.199.38: seq=5 ttl=64 time=6.841 ms
+64 bytes from 10.10.199.38: seq=6 ttl=64 time=6.639 ms
+```
