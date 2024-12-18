@@ -67,7 +67,7 @@ public class Agreement extends GenericProtocol {
         super(PROTOCOL_NAME, PROTOCOL_ID);
 
         /* Init Membership State */
-        this.self = new Host(InetAddress.getByName("localhost"),
+        this.self = new Host(InetAddress.getByName(props.getProperty("address")),
                 Integer.parseInt(props.getProperty("p2p_port")));
         this.membership = new LinkedList<Host>();
         this.isLeader = false;
@@ -95,18 +95,15 @@ public class Agreement extends GenericProtocol {
     public void init(Properties props) {
         try {
             List<Host> initialMembership = new LinkedList<>();
-            System.out.println(props.getProperty("initial_membership"));
             String[] leaderAddressParts = props.getProperty("initial_membership").split(",")[0].split(":");
             String leaderHostname = leaderAddressParts[0];
             int leaderPort = Integer.parseInt(leaderAddressParts[1]);
             Host leaderHost = new Host(InetAddress.getByName(leaderHostname), leaderPort);
             initialMembership.add(leaderHost);
-
-            if (leaderHost.equals(self)) {
+            if (leaderPort == self.getPort()) {
                 this.isLeader = true;
                 this.currentLeader = self;
                 setupPeriodicTimer(new HeartbeatTimer(), LEADER_TIMEOUT / 2, LEADER_TIMEOUT / 2);
-
             } else {
                 this.isLeader = false;
                 this.currentLeader = leaderHost;
@@ -171,7 +168,8 @@ public class Agreement extends GenericProtocol {
             return;
         }
 
-        if (this.membership.size() < 3 && this.membership.contains(self)) {
+        boolean containsSelf = this.membership.stream().anyMatch(host -> host.getPort() == self.getPort());
+        if (this.membership.size() < 3 && containsSelf) {
             executeJoinAgreementWithoutQuourum(joiningNode, operationId, instance);
             return;
         }
