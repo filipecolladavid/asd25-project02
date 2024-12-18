@@ -88,9 +88,10 @@ public class StateMachine extends GenericProtocol {
         this.applicationState = new HashMap<>();
 
         /* Init Self Host */
-        String address = props.getProperty("address");
+        // String address = props.getProperty("address");
+        String address = "localhost";
         String port = props.getProperty("p2p_port");
-        this.self = new Host(InetAddress.getByName(address), Integer.parseInt(port));
+        this.self = new Host(InetAddress.getByName("localhost"), Integer.parseInt(port));
 
         /* Init Network State */
         Properties channelProps = new Properties();
@@ -133,6 +134,7 @@ public class StateMachine extends GenericProtocol {
     @Override
     public void init(Properties props) {
         triggerNotification(new ChannelReadyNotification(channelID, self));
+        System.out.println(props.getProperty("initial_membership"));
         String[] leaderAddressParts = props.getProperty("initial_membership").split(",")[0].split(":");
         String leaderHostname = leaderAddressParts[0];
         int leaderPort = Integer.parseInt(leaderAddressParts[1]);

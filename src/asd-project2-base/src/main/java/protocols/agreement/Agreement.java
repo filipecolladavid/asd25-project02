@@ -67,7 +67,7 @@ public class Agreement extends GenericProtocol {
         super(PROTOCOL_NAME, PROTOCOL_ID);
 
         /* Init Membership State */
-        this.self = new Host(InetAddress.getByName(props.getProperty("address")),
+        this.self = new Host(InetAddress.getByName("localhost"),
                 Integer.parseInt(props.getProperty("p2p_port")));
         this.membership = new LinkedList<Host>();
         this.isLeader = false;
@@ -95,6 +95,7 @@ public class Agreement extends GenericProtocol {
     public void init(Properties props) {
         try {
             List<Host> initialMembership = new LinkedList<>();
+            System.out.println(props.getProperty("initial_membership"));
             String[] leaderAddressParts = props.getProperty("initial_membership").split(",")[0].split(":");
             String leaderHostname = leaderAddressParts[0];
             int leaderPort = Integer.parseInt(leaderAddressParts[1]);

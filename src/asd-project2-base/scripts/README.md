@@ -51,11 +51,11 @@
     90szd1km2liqn1x3kueal0r7i     kadabra-08   Ready     Active                          27.4.0
     ```
 4. Run the ```updateDockerImage.sh```
-   1. ```bash ./updateDockerImage.sh 'kadabra-05','kadabra-06','kadabra-07'```
+   1. ```bash ./updateDockerImage.sh 'squirtle-1','squirtle-2','squirtle-3'```
 5. Run the ```bash ./runDockerNodes.sh```
-   1. ```./runDockerNodes.sh ABD 3 'kadabra-05','kadabra-06','kadabra-07' abd```
+   1. ```./runDockerNodes.sh ABD 3 'squirtle-1','squirtle-2','squirtle-3' abd```
    2. ```./runDockerNodes.sh <EXPERIMENTNAME> <NumberNodes> {HOSTS} <ProgramLocation>```
-6. Run the ```bash ./runJavaNodes.sh abdResults 3 "{kadabra-06,kadabra-07,kadabra-08}" abd```
+6. Run the ```bash ./runJavaNodes.sh abdResults 3 "{squirtle-1,squirtle-2,squirtle-3}" abd```
    1. ```bash ./runJavaNodes <ResultsFolder> <NumberNodes> {HOSTS} <ProgramLocation>```
 
 ## Current state

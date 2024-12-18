@@ -82,7 +82,7 @@ public class Main {
 
     public static String getIpOfInterface(String interfaceName) throws SocketException {
         if (interfaceName.equalsIgnoreCase("lo"))
-            return "127.0.0.1"; // This is an special exception to deal with the loopback.
+            return "0.0.0.0"; // This is an special exception to deal with the loopback.
         NetworkInterface networkInterface = NetworkInterface.getByName(interfaceName);
         System.out.println(networkInterface);
         Enumeration<InetAddress> inetAddress = networkInterface.getInetAddresses();
