@@ -112,13 +112,13 @@ public class HashApp extends GenericProtocol {
 
         /*-------------------- Register Execute Notification Handler --------------- */
         subscribeNotification(ExecuteNotification.NOTIFICATION_ID, this::uponExecuteNotification); // For Paxos
-        // subscribeNotification(ReadCompleteNotification.NOTIFICATION_ID, this::uponReadCompleteNotification); // For ABD
-        //                                                                                                      // interaction
-        // subscribeNotification(WriteCompleteNotification.NOTIFICATION_ID, this::uponWriteCompleteNotification); // For
-        //                                                                                                        // ABD
-        //                                                                                                        // interaction
-        // subscribeNotification(UpdateValueNotification.NOTIFICATION_ID, this::uponUpdateValueNotification); // For ABD
-                                                                                                           // interaction
+        subscribeNotification(ReadCompleteNotification.NOTIFICATION_ID, this::uponReadCompleteNotification); // For ABD
+                                                                                                             // interaction
+        subscribeNotification(WriteCompleteNotification.NOTIFICATION_ID, this::uponWriteCompleteNotification); // For
+                                                                                                               // ABD
+                                                                                                               // interaction
+        subscribeNotification(UpdateValueNotification.NOTIFICATION_ID, this::uponUpdateValueNotification); // For ABD
+                                                                                                        //    interaction
 
         /*-------------------- Register Request Handler ---------------------------- */
         registerRequestHandler(CurrentStateRequest.REQUEST_ID, this::uponCurrentStateRequest);

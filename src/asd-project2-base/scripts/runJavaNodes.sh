@@ -49,7 +49,7 @@ for i in $(seq 1 $nNodes); do
     # Command to execute the Java process in the container
     cmd="cd /home/asd/${jarLocation} && java -DlogFilename=logs/node${p2p_port} \
                 -cp /home/asd/${jarLocation}/target/asdProj2.jar Main \
-                -conf config.properties \
+                -conf configCluster.properties \
                 address=$name p2p_port=${p2p_port} server_port=${server_port} \
                 initial_membership=${membership}"
 
