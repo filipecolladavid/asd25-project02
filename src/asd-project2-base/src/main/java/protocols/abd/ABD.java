@@ -52,11 +52,12 @@ public class ABD extends GenericProtocol {
     public final static short PROTOCOL_ID = 100;
     public final static String PROTOCOL_NAME = "ABD";
     // Interval to execute pending operations
-    private static final long RETRY_INTERVAL = 1;
+    private static final long RETRY_INTERVAL = 5;
     // Interval to print the current state of the replica  - for debugging.
     private static final long STATUS_LOG = 10000;
     // Interval for HEALTH_CHECK - if a replica needs to be removed.
     private static final long HEALTH_CHECK = 15000;
+    private static final boolean activeMembership = false;
 
     private int channelID;
 
@@ -96,7 +97,7 @@ public class ABD extends GenericProtocol {
     private AtomicInteger opSeq;
 
     // Keeps track of how many operations it has done
-    private final static int MAX_CONCURRENT_OPERATIONS = 20;
+    private final static int MAX_CONCURRENT_OPERATIONS = 20000;
 
     /**
      * System always assumed to start with 3 replicas.
@@ -219,7 +220,7 @@ public class ABD extends GenericProtocol {
                 Integer.parseInt(props.getProperty("p2p_port"))
         );
 
-        logger.info("[{}] Initializing ABD", myself);
+        // logger.info("[{}] Initializing ABD", myself);
 
         // State of the replica
         membership = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -246,8 +247,8 @@ public class ABD extends GenericProtocol {
             }
             membershipTag = Pair.of(0, myself);
             setReady(true);
-            logger.info("[{}] is Ready!", myself);
-            logger.info("[{}] membership size: {}", myself, membership.size());
+            // logger.info("[{}] is Ready!", myself);
+            // logger.info("[{}] membership size: {}", myself, membership.size());
         } else {
             // Request to join
             String c = props.getProperty("contact");
@@ -285,7 +286,7 @@ public class ABD extends GenericProtocol {
      * @param channelId used to communicate
      */
     private void uponJoinMessage(JoinMessage msg, Host host, short sourceProto, int channelId) {
-        logger.info("[{}] {} is trying to join the system", myself, msg.getMyself());
+        // logger.info("[{}] {} is trying to join the system", myself, msg.getMyself());
         // Used to know the operation
         UUID uuid = UUID.randomUUID();
         Operation op = new MembershipOperation(new MembershipRequest(
@@ -306,7 +307,7 @@ public class ABD extends GenericProtocol {
      */
     private void uponWriteRequest(WriteRequest request, short sourceProto) {
         if(ready) {
-            logger.info("[{}] Received {} from application", myself, request);
+            // logger.info("[{}] Received {} from application", myself, request);
             Operation op = new ReadWriteOperation(request, opSeq.incrementAndGet());
             pendingOperations.add(Pair.of(new String(request.getKey()), op));
         }
@@ -320,7 +321,7 @@ public class ABD extends GenericProtocol {
      */
     private void uponReadRequest(ReadRequest request, short sourceProto) {
         if(ready) {
-            logger.info("[{}] Received {} from application", myself, request);
+            // logger.info("[{}] Received {} from application", myself, request);
             Operation op = new ReadWriteOperation(request, opSeq.incrementAndGet());
             pendingOperations.add(Pair.of(new String(request.getKey()), op));
         }
@@ -333,41 +334,43 @@ public class ABD extends GenericProtocol {
      * @param l
      */
     private void uponStartHealthCheck(ProtoTimer protoTimer, long l) {
-        if(isReady()) {
-            if (!isMembershipOperation() && !inHealthCheck()) {
-                Set<Host> missingElements = new HashSet<>(membership);
-                missingElements.removeAll(currentlyAlive);
-                logger.info("[{}] Starting Health Check", myself);
-                if (!missingElements.isEmpty()) {
-                    for (Host host : missingElements) {
-                        logger.info("[{}] {} is not responding", myself, host);
-                        // Used to know the operation
-                        UUID uuid = UUID.randomUUID();
-                        Operation op = new MembershipOperation(new MembershipRequest(
-                                host),
-                                opSeq.incrementAndGet(),
-                                uuid,
-                                host,
-                                Action.REMOVE
-                        );
-                        pendingOperations.addFirst(Pair.of(uuid.toString(), op));
+        if (activeMembership) {
+            if(isReady()) {
+                if (!isMembershipOperation() && !inHealthCheck()) {
+                    Set<Host> missingElements = new HashSet<>(membership);
+                    missingElements.removeAll(currentlyAlive);
+                    // logger.info("[{}] Starting Health Check", myself);
+                    if (!missingElements.isEmpty()) {
+                        for (Host host : missingElements) {
+                            // logger.info("[{}] {} is not responding", myself, host);
+                            // Used to know the operation
+                            UUID uuid = UUID.randomUUID();
+                            Operation op = new MembershipOperation(new MembershipRequest(
+                                    host),
+                                    opSeq.incrementAndGet(),
+                                    uuid,
+                                    host,
+                                    Action.REMOVE
+                            );
+                            pendingOperations.addFirst(Pair.of(uuid.toString(), op));
+                        }
+                    } else {
+                        // TODO - replace by reliable broadcast
+                        Ping ping = new Ping();
+                        for (Host host : membership) {
+                            openConnection(host);
+                            sendMessage(ping, host);
+                        }
                     }
-                } else {
-                    // TODO - replace by reliable broadcast
-                    Ping ping = new Ping();
-                    for (Host host : membership) {
-                        openConnection(host);
-                        sendMessage(ping, host);
-                    }
+                    currentlyAlive.clear();
                 }
-                currentlyAlive.clear();
             }
-        }
-        else {
-            if (!membership.isEmpty()) {
-                Host contact = membership.iterator().next();
-                openConnection(contact);
-                sendMessage(new JoinMessage(myself), contact);
+            else {
+                if (!membership.isEmpty()) {
+                    Host contact = membership.iterator().next();
+                    openConnection(contact);
+                    sendMessage(new JoinMessage(myself), contact);
+                }
             }
         }
     }
@@ -397,6 +400,8 @@ public class ABD extends GenericProtocol {
      */
     private void uponStartOperation(ProtoTimer protoTimer, long l) {
         if (isReady()) {
+            // logger.info("[{}] Pending operation size: {}", myself,pendingOperations.size());
+            // logger.info("[{}] InProgress operation size: {}", myself,inProgressOperations.size());
             if (!pendingOperations.isEmpty() && !isMembershipOperation()) {
                 Pair<String, Operation> p = pendingOperations.poll();
                 String key = p.getLeft();
@@ -404,20 +409,20 @@ public class ABD extends GenericProtocol {
 
                 if(!inProgressOperations.containsKey(key)) {
                     if (inProgressOperations.size() <= MAX_CONCURRENT_OPERATIONS) {
-                        logger.info("[{}] Inserted key {} for request {} on inProgressOperations Map",
-                                myself,
-                                key,
-                                op.getRequest()
-                        );
+                        // logger.info("[{}] Inserted key {} for request {} on inProgressOperations Map",
+                        //         myself,
+                        //         key,
+                        //         op.getRequest()
+                        // );
                         inProgressOperations.put(key, op);
                         int seqNum = opSeq.get();
                         startOperation(Pair.of(seqNum, op), key);
 
                     } else {
-                        logger.info("[{}] Maximum concurrent operations reached", myself);
+                        // logger.info("[{}] Maximum concurrent operations reached", myself);
                     }
                 } else {
-                    logger.info("[{}] Current key is mid operation", myself);
+                    // logger.info("[{}] Current key is mid operation", myself);
                 }
             }
         }
@@ -462,7 +467,7 @@ public class ABD extends GenericProtocol {
      * @param opNumSeq the seq number of the operation
      */
     private void startMembershipOperation(MembershipOperation op, int opNumSeq) {
-        logger.info("[{}] Starting Membership Operation", myself);
+        // logger.info("[{}] Starting Membership Operation", myself);
 
         // Updated tag to broadcast
         membershipTag = Pair.of(opNumSeq, myself);
@@ -534,7 +539,7 @@ public class ABD extends GenericProtocol {
      */
     private void uponReadTagMembership(ReadTagMembership msg, Host host, short sourceProto, int channelID) {
         if (isReady()) {
-            logger.info("[{}] Received {} from {}", myself, msg, host);
+            // logger.info("[{}] Received {} from {}", myself, msg, host);
             ReadTagReplyMembership readTagReply = new ReadTagReplyMembership(membershipTag, msg.getOpID());
 
             openConnection(host);
@@ -551,7 +556,7 @@ public class ABD extends GenericProtocol {
      */
     private void uponReadTag(ReadTag msg, Host host, short sourceProto, int channelId) {
         if(isReady()) {
-            logger.info("[{}] Received {} from {}", myself, msg, host);
+            // logger.info("[{}] Received {} from {}", myself, msg, host);
             String key = new String(msg.getKey());
             Pair<Integer, Host> pair = tag.get(key);
             if (pair == null) {
@@ -590,7 +595,7 @@ public class ABD extends GenericProtocol {
      */
     private void uponReadTagReplyMembership(ReadTagReplyMembership msg, Host host, short sourceProto, int channelID) {
         if (isReady()) {
-            logger.info("[{}] Received {} from {}", myself, msg, host);
+            // logger.info("[{}] Received {} from {}", myself, msg, host);
             if(inProgressOperations.containsKey(msg.getPeerOpID().toString())) {
                 MembershipOperation op = (MembershipOperation) inProgressOperations.get(msg.getPeerOpID().toString());
                 op.getAnswersReadTag().add(msg.getTag());
@@ -630,14 +635,14 @@ public class ABD extends GenericProtocol {
      */
     private void uponReadTagReply(ReadTagReply msg, Host host, short sourceProto, int channelId) {
         if (isReady()) {
-            logger.info("[{}] Received {} from {}", myself, msg, host);
+            // logger.info("[{}] Received {} from {}", myself, msg, host);
             // Otherwise, probably an old ack
             if (inProgressOperations.containsKey(new String(msg.getKey())) ){
                 ReadWriteOperation op = (ReadWriteOperation)inProgressOperations.get(new String(msg.getKey()));
                 op.getAnswersReadTag().add(msg.getTag());
                 // We have enough answers for a quorum
                 if (op.getAnswersReadTag().size() == ((membership.size() + 1)/2)+1) {
-                    logger.info("[{}] Operation: {}", myself, op);
+                    // logger.info("[{}] Operation: {}", myself, op);
                     int new_tag = getMaxSQTag(op.getAnswersReadTag());
                     opSeq.incrementAndGet();
                     op.incrementOpSeq();
@@ -653,7 +658,7 @@ public class ABD extends GenericProtocol {
                     }
 
                     // Write here - not sending to myself
-                    logger.info("[{}] Updating values", myself);
+                    // logger.info("[{}] Updating values", myself);
                     tag.put(new String(wm.getKey()), wm.getTag());
                     val.put(new String(wm.getKey()), wm.getData() == null ? new byte[0] : wm.getData());
 
@@ -673,7 +678,7 @@ public class ABD extends GenericProtocol {
      */
     private void uponWriteMessageMembership(WriteMessageMembership msg, Host host, short sourceProto, int channelID) {
         if (isReady()) {
-            logger.info("[{}] Received {} from {}", myself, msg, host);
+            // logger.info("[{}] Received {} from {}", myself, msg, host);
             this.membershipTag = msg.getTag();
             switch (msg.getAction()) {
                 case JOIN:
@@ -709,7 +714,7 @@ public class ABD extends GenericProtocol {
      */
     public void uponWriteMessage(WriteMessage msg, Host host, short sourceProto, int channelId) {
         if (isReady()) {
-            logger.info("[{}] Received {} from {}", myself, msg, host);
+            // logger.info("[{}] Received {} from {}", myself, msg, host);
 
             synchronized (this) {
                 Pair<Integer, Host> currentTag = tag.get(new String(msg.getKey()));
@@ -747,14 +752,14 @@ public class ABD extends GenericProtocol {
 
         setReady(true);
 
-        logger.info("[{}] Joinned the system", myself);
+        // logger.info("[{}] Joinned the system", myself);
     }
 
     /**
      * When receiving a JoinnedMessage from a freshly joined replica. It updates the membership.
      */
     private void uponJoinnedMessage(JoinnedMessage msg, Host host, short sourceProto, int channelId) {
-        logger.info("[{}] Received {} from {}", myself, msg, host);
+        // logger.info("[{}] Received {} from {}", myself, msg, host);
         inProgressOperations.remove(msg.getOpID().toString());
         pendingMembership.remove(host);
         membership.add(host);
@@ -768,7 +773,7 @@ public class ABD extends GenericProtocol {
      */
     private void uponAckMembership(AckMembership msg, Host host, short sourceProto, int channelId) {
         if (isReady()) {
-            logger.info("[{}] Received {} from {}", myself, msg, host);
+            // logger.info("[{}] Received {} from {}", myself, msg, host);
             if(inProgressOperations.containsKey(msg.getOpID().toString())) {
                 MembershipOperation op = (MembershipOperation) inProgressOperations.get(msg.getOpID().toString());
                 if (msg.getOpSeq() == op.getOpSeq()) {
@@ -776,7 +781,7 @@ public class ABD extends GenericProtocol {
                     if (op.getAnswersAck().size() == (membership.size()+1)/2 + 1) {
                         switch (msg.getAction()) {
                             case JOIN:
-                                logger.info("[{}] Sending state to new replica", myself);
+                                // logger.info("[{}] Sending state to new replica", myself);
                                 pendingMembership.add(op.getPending().getRight());
                                 // Membership still doesn't have new replica
                                 JoinReply jr = new JoinReply(this.membership, membershipTag, msg.getOpID());
@@ -785,7 +790,7 @@ public class ABD extends GenericProtocol {
                                 break;
 
                             case REMOVE:
-                                logger.info("[{}] Remove replica", myself);
+                                // logger.info("[{}] Remove replica", myself);
                                 membership.remove(op.getPending().getRight());
                                 break;
                         }
@@ -812,21 +817,21 @@ public class ABD extends GenericProtocol {
      */
     private void uponAck(Ack msg, Host host, short sourceProto, int channelId) {
         if (isReady()) {
-            logger.info("[{}] Received {} from {}", myself, msg, host);
+            // logger.info("[{}] Received {} from {}", myself, msg, host);
             if(inProgressOperations.containsKey(new String(msg.getKey()))) {
                 ReadWriteOperation op = (ReadWriteOperation) inProgressOperations.get(new String(msg.getKey()));
                 if (msg.getOpSeq() == op.getOpSeq()) {
                     op.getAnswersAck().add(host);
                     if (op.getAnswersAck().size() == (membership.size()+1)/2 + 1) {
                         if (op.getPending().getRight() == null) {
-                            logger.info("[{}] Triggered Write Complete notification", myself);
+                            // logger.info("[{}] Triggered Write Complete notification", myself);
                             triggerNotification(new WriteCompleteNotification(
                                     op.getPending().getLeft(),
                                     msg.getKey(),
                                     val.get(new String(msg.getKey())))
                             );
                         } else {
-                            logger.info("[{}] Triggered Read Complete notification", myself);
+                            // logger.info("[{}] Triggered Read Complete notification", myself);
                             triggerNotification(new ReadCompleteNotification(
                                     msg.getKey(),
                                     op.getPending().getRight(),
@@ -857,7 +862,7 @@ public class ABD extends GenericProtocol {
     public void uponReadMessage(ReadMessage msg, Host host, short sourceProto, int channelId) {
         if (isReady()) {
             String key = new String(msg.getKey());
-            logger.info("[{}] Received ReadMessage for key: {} from {}", myself, key, host);
+            // logger.info("[{}] Received ReadMessage for key: {} from {}", myself, key, host);
 
             Pair<Integer, Host> tagSend;
             byte[] valToSend;
@@ -904,7 +909,7 @@ public class ABD extends GenericProtocol {
      */
     public void uponReadReply(ReadReply msg, Host host, short sourceProto, int channelId) {
         if (isReady()) {
-            logger.info("[{}] Received {} from {}", myself, msg, host);
+            // logger.info("[{}] Received {} from {}", myself, msg, host);
             if (inProgressOperations.containsKey(new String(msg.getKey()))) {
                 ReadWriteOperation op = (ReadWriteOperation)inProgressOperations.get(new String(msg.getKey()));
                 if (msg.getPeerOpID() == op.getOpSeq()) {
@@ -913,7 +918,7 @@ public class ABD extends GenericProtocol {
                         ReadReply msgMax = getMaxReply(op.getAnswersReadReply());
                         if (msgMax.getTag() == null) {
                             // No key was found can return zero byte char to the application
-                            logger.info("[{}] Triggered Read Complete notification", myself);
+                            // logger.info("[{}] Triggered Read Complete notification", myself);
                             triggerNotification(new ReadCompleteNotification(
                                     msg.getKey(),
                                     new byte[0],
