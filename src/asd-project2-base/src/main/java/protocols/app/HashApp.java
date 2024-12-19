@@ -118,7 +118,7 @@ public class HashApp extends GenericProtocol {
                                                                                                                // ABD
                                                                                                                // interaction
         subscribeNotification(UpdateValueNotification.NOTIFICATION_ID, this::uponUpdateValueNotification); // For ABD
-                                                                                                        //    interaction
+                                                                                                           // interaction
 
         /*-------------------- Register Request Handler ---------------------------- */
         registerRequestHandler(CurrentStateRequest.REQUEST_ID, this::uponCurrentStateRequest);
@@ -193,7 +193,6 @@ public class HashApp extends GenericProtocol {
 
             cumulativeHash = appendOpToHash(cumulativeHash, op.getData());
 
-            logger.info("Executing: " + op);
             // Execute if it is a write operation
             if (op.getOpType() == RequestMessage.WRITE) {
                 data.put(op.getKey(), op.getData());
