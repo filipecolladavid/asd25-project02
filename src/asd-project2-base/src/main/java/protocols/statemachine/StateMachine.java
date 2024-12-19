@@ -90,7 +90,9 @@ public class StateMachine extends GenericProtocol {
         /* Init Self Host */
         String address = props.getProperty("address");
         String port = props.getProperty("p2p_port");
+
         this.self = new Host(InetAddress.getByName(address), Integer.parseInt(port));
+        logger.info("Self:[{}] Initializing State Machine with Adress {} and Port {}", self, address, port);
 
         /* Init Network State */
         Properties channelProps = new Properties();
