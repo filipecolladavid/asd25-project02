@@ -52,7 +52,7 @@ public class ABD extends GenericProtocol {
     public final static short PROTOCOL_ID = 100;
     public final static String PROTOCOL_NAME = "ABD";
     // Interval to execute pending operations
-    private static final long RETRY_INTERVAL = 50;
+    private static final long RETRY_INTERVAL = 1;
     // Interval to print the current state of the replica  - for debugging.
     private static final long STATUS_LOG = 10000;
     // Interval for HEALTH_CHECK - if a replica needs to be removed.

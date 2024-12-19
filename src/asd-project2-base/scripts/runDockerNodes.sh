@@ -1,12 +1,11 @@
-#!/bin/bash   
+#!/bin/bash
 
 if [ "$#" -ne 4 ]; then
     echo "$0 <resultFolderID> <nNodes> {<host1>,...,<hostn>} <jarLocation>"
     exit 1
 fi
 
-
-resultsDir=/home/$(whoami)/results/$i
+resultsDir=/home/$(whoami)/results/$1
 if [ ! -d $resultsDir ]; then
   mkdir $resultsDir && echo "created $resultsDir"
 fi
@@ -28,6 +27,11 @@ if [ ! -d $jarDir ]; then
   mkdir -p $jarDir && echo "created $jarDir"
 fi
 
+clientDir=/home/$(whoami)/client
+if [ ! -d $clientDir ]; then
+  mkdir -p $clientDir && echo "created $clientDir"
+fi
+
 IFS=$'\n' read -d '' -r -a ips < ./ips200.txt
 
 max=$(( ${#hosts[@]} - 1 ))
@@ -39,19 +43,32 @@ s=0
 
 for i in $(seq 1 $nNodes)
 do
-	name=asd-$i
-	ip=${ips[$i-1]}
-	server=${hosts[$s]}
-	echo $name $ip $server
-	if [ ! -d ${resultsDir}/${name} ]; then
-	  mkdir ${resultsDir}/${name} && echo "created ${resultsDir}/${name}"
-	fi
+    if [ $i -eq 1 ]; then
+        name=client
+        ip=${ips[$i-1]}
+        server=${hosts[$s]}
+        echo $name $ip $server
+        if [ ! -d ${resultsDir}/${name} ]; then
+          mkdir ${resultsDir}/${name} && echo "created ${resultsDir}/${name}"
+        fi
 
-	echo "ssh $server \"docker run --rm -d -t --cpus=$cpu --privileged -v $jarDir:/home/asd/$4 -v $resultsDir/$name:/home/asd/logs -v /lib/modules:/lib/modules --cap-add=ALL --net $net --ip $ip --name $name --hostname $name $image $i $bandwidth\""
-	ssh $server "docker run --rm -d -t --cpus=$cpu --privileged -v $jarDir:/home/asd/$4 -v $resultsDir/$name:/home/asd/logs -v /lib/modules:/lib/modules --cap-add=ALL --net $net --ip $ip --name $name --hostname $name $image $i $bandwidth"
+        echo "ssh $server \"docker run --rm -d -t --cpus=$cpu --privileged -v $clientDir:/home/asd/client -v $resultsDir/$name:/home/asd/logs -v /lib/modules:/lib/modules --cap-add=ALL --net $net --ip $ip --name $name --hostname $name $image 1 $bandwidth\""
+        ssh $server "docker run --rm -d -t --cpus=$cpu --privileged -v $clientDir:/home/asd/client -v $resultsDir/$name:/home/asd/logs -v /lib/modules:/lib/modules --cap-add=ALL --net $net --ip $ip --name $name --hostname $name $image 1 $bandwidth"
+    else
+        name=asd-$((i-1))
+        ip=${ips[$i-1]}
+        server=${hosts[$s]}
+        echo $name $ip $server
+        if [ ! -d ${resultsDir}/${name} ]; then
+          mkdir ${resultsDir}/${name} && echo "created ${resultsDir}/${name}"
+        fi
 
-	s=$(( $s + 1 ))
-	if [ $s -gt $max ]; then
-		s=0
-	fi
+        echo "ssh $server \"docker run --rm -d -t --cpus=$cpu --privileged -v $jarDir:/home/asd/$4 -v $resultsDir/$name:/home/asd/logs -v /lib/modules:/lib/modules --cap-add=ALL --net $net --ip $ip --name $name --hostname $name $image $i $bandwidth\""
+        ssh $server "docker run --rm -d -t --cpus=$cpu --privileged -v $jarDir:/home/asd/$4 -v $resultsDir/$name:/home/asd/logs -v /lib/modules:/lib/modules --cap-add=ALL --net $net --ip $ip --name $name --hostname $name $image $i $bandwidth"
+    fi
+
+    s=$(( $s + 1 ))
+    if [ $s -gt $max ]; then
+        s=0
+    fi
 done
