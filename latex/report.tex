@@ -146,7 +146,7 @@ The Babel framework is a Java-based framework developed in the NOVA LINCS (Nova 
 
 \subsection{Multi-Paxos}
 \label{sec:MultiPaxos}
-In the paper "Paxos Made Simple"(implicitly describing Multi-Paxos as an optimization), Leslie Lamport explores how to optimize the Paxos consensus protocol for practical state machine replication. The protocol became widely recognized after its implementation by major companies like Google, and has since become a cornerstone for building fault-tolerant distributed systems, being particularly efficient for maintaining consistent state across multiple replicas.
+In the paper "Paxos Made Simple"\cite{Lamport2001PaxosMS}(implicitly describing Multi-Paxos as an optimization), Leslie Lamport explores how to optimize the Paxos consensus protocol for practical state machine replication. The protocol became widely recognized after its implementation by major companies like Google, and has since become a cornerstone for building fault-tolerant distributed systems, being particularly efficient for maintaining consistent state across multiple replicas.
 
 The key insight of Multi-Paxos is that in a sequence of consensus decisions, such as in state machine replication, it's inefficient to run the complete Paxos protocol for each decision. Instead, after a leader is elected, subsequent consensus decisions can skip the prepare phase, reducing the message exchanges from 4 to 2 rounds. This optimization proves especially valuable in geo-distributed settings where network latency is significant.
 
@@ -157,7 +157,7 @@ Multi-Paxos can be enhanced to handle membership changes automatically by treati
 
 \subsection{ABD}
 \label{sec:ABD}
-In the paper "Sharing Memory Robustly in Message-Passing Systems"\cite{abd} (also known as ABD - H. Attiya, A. Bar-Noy, D. Dolev), the authors explore the implementation of shared memory in message-passing systems, by presenting emulators that translate shared-memory algorithms to message-passing models, implementing wait-free, atomic, single-writer multi-reader registers in unreliable, asynchronous networks. This approach takes advantages of quorum based systems in order to achieve replication of a single register, it does so by ensuring that every write is propagated through the system, and that every read returns the most recent value in the system.
+In the paper "Sharing Memory Robustly in Message-Passing Systems"\cite{abd} (also known as ABD - H. Attiya, A. Bar-Noy, D. Dolev), the authors explore the implementation of sharing memory in message-passing systems, by presenting emulators that translate shared-memory algorithms to message-passing models, implementing wait-free, atomic, single-writer multi-reader registers in unreliable, asynchronous networks. This approach takes advantages of quorum based systems in order to achieve replication of a single register, it does so by ensuring that every write is propagated through the system, and that every read returns the most recent value in the system.
 \par It's easily adapted to multiple registers, by running several instances of ABD in parallel identified by a key, additionally we can also run instances of ABD to automatically manage the membership of the system.
 \par By changing the original protocol to account for multiple registers and handle membership change, we can achieve a SMR similar to Multi-Paxos(\ref{sec:MultiPaxos}), where membership is automatically managed via a series o mechanisms. These mechanisms will be expanded in the Implementation(\ref{sec:ABDImpl}) section of this report
 
@@ -204,6 +204,7 @@ The leader election itself is conducted through a complete Paxos instance, where
 When the Agreement protocol completes the Paxos consensus for leader election, each node's Agreement protocol will notify its local SMR protocol through a \texttt{LeaderDecidedNotification}. This notification triggers the following state changes in the SMR protocol:
 
 \begin{itemize}
+  	\setlength\itemsep{0em}
 	\item If the local node is the new leader, sets its \texttt{isLeader} flag to true and starts the heartbeat timer
 	\item Updates its \texttt{currentLeader} reference
 	\item If not the leader, establishes a connection to the new leader
@@ -218,6 +219,7 @@ When a new node wants to join the system, it sends a join request to its contact
 
 Before minimum quorum:
 \begin{itemize}
+  	\setlength\itemsep{0em}
 	\item The leader can immediately accept new nodes without running consensus
 	\item The leader updates its membership list and sends a \texttt{StateTransferMessage} to the joining node
 	\item The joining node becomes ready to participate after processing the \texttt{StateTransferMessage}
@@ -225,6 +227,7 @@ Before minimum quorum:
 
 After minimum quorum:
 \begin{itemize}
+  	\setlength\itemsep{0em}
 	\item The contact node forwards the join request to the current leader
 	\item The leader creates a special join operation and initiates a Paxos instance
 	\item Upon consensus completion, the leader sends a \texttt{StateTransferMessage} to the joining node
@@ -253,6 +256,7 @@ The consensus implementation optimizes for the common case of a stable leader wh
 
 1. \textbf{Normal Operation (Stable Leader):}
    \begin{itemize}
+    	\setlength\itemsep{0em}
    \item Leader skips Prepare phase and directly sends AcceptPaxosMessage to all replicas
    \item Acceptors respond with LearnPaxosMessage
    \item Decision reached after quorum of Learn messages
@@ -260,6 +264,7 @@ The consensus implementation optimizes for the common case of a stable leader wh
 
 2. \textbf{Leader Recovery:}
    \begin{itemize}
+    	\setlength\itemsep{0em}
    \item New leader must start complete Paxos instance with Prepare phase
    \item Sends PrepareMessage with higher ballot number
    \item Collects Promise responses from quorum
@@ -268,6 +273,7 @@ The consensus implementation optimizes for the common case of a stable leader wh
 
 3. \textbf{Decision Processing:}
    \begin{itemize}
+    	\setlength\itemsep{0em}
    \item Upon receiving a quorum of accepts, processes decision based on operation type
    \item For leader election operations, updates leadership state and starts heartbeat if elected
    \item For join operations, updates membership list with new node
@@ -276,6 +282,7 @@ The consensus implementation optimizes for the common case of a stable leader wh
    \end{itemize}
 The implementation maintains all necessary state for each Paxos instance in a \texttt{PaxosInstance} class, which tracks:
 \begin{itemize}
+  	\setlength\itemsep{0em}
 	\item Ballot numbers
 	\item Promise and accept quorums
 	\item Instance type (REGULAR, JOIN, or LEADERELECTION)
@@ -320,68 +327,40 @@ Records the operation as decided
 
 In case of leadership changes, operations in progress may need to be restarted under the new leader. The system ensures safety by tracking decided operations to prevent duplicate execution.
 
-\subsubsection{Limitation and Future Work}
-Our current implementation, while functional, has several areas for potential improvement:
-\textbf{Operation Recovery After Leadership Change}
-Currently, when a new leader is elected, pending operations at the old leader are lost. A more robust implementation would include a mechanism to transfer pending operations to the new leader. This could be achieved by having replicas resend their pending operations to the new leader after receiving a LeaderDecidedNotification.
-\textbf{Automatic Failure Detection and Cleanup}
-While our implementation handles leader failure through the heartbeat mechanism, it lacks automatic cleanup of crashed replicas from the membership. Implementing this would require:
-\begin{itemize}
-	\item A failure detection mechanism similar to the leader heartbeat
-	\item A consensus round to remove failed replicas
-	\item State cleanup for removed replicas
-\end{itemize}
-\textbf{Operation Processing Optimization}
-Our current implementation handles operation requests and their execution in the same thread/context - when a request arrives, the handler both processes the request and, if appropriate, executes the propose operation immediately. We attempted to separate these concerns by having request handlers only validate the request and add it to a pendingOperations queue, with a separate periodic timer responsible for processing this queue and executing the propose operations. However, this approach resulted in significant performance degradation compared to the immediate execution model, leading us to maintain the coupled implementation. The cause of this performance issue with the decoupled approach warrants further investigation.
-\textbf{Code and Data Structure Optimization}
-The current implementation has several redundant data structures and classes that could be consolidated:
-\begin{itemize}
-	\item Merge similar message types (PaxosMessage variants)
-	\item Unify notification structures across protocols
-	\item Reduce code duplication in message handlers
-	\item Simplify state tracking across Agreement and SMR protocols
-\end{itemize}
-\textbf{Additional Improvements}
-Several other enhancements could be made to the system:
-\begin{itemize}
-	\item Implement state transfer optimization to reduce the cost of bringing new replicas up-to-date
-	\item Implement snapshotting for faster recovery
-	\item Optimize the communication patterns between replicas
-\end{itemize}
-
-
 \subsection{ABD based SMR}
 \label{sec:ABDImpl}
-The implementation of state machine replication using quorums is essentially multiple ABD instances running in parallel with different objectives guaranteeing serialisability of each individual key or each membership change in the system. These objectives are defined in our implementation as \textbf{Operations} (Read Write Operation and Membership Operation). This implementation also assumes that the system always starts with three initial replicas (initial membership), but can handle memberships joining afterwards or leaving. Additionally, the system works as intended as long as three replicas remain in it.
+The implementation of state machine replication using quorums is essentially multiple ABD instances running in parallel with different objectives guaranteeing serialisability of each individual key or each membership change in the system. These objectives are defined in our implementation as \textbf{Operations} (Read Write Operation and Membership Operation). This implementation also assumes that the system starts with, at least, three initial replicas (initial membership), but can handle memberships joining afterwards or leaving. Additionally, the system works as intended as long as three replicas remain in it.
 \subsubsection{Initialization}
 \label{sec:initABD}
-Upon starting, each replica starts initializes it's own state, that consists of:
+The initialization of each ABD replica is described in the appendix \ref{code:ABDSMR}, Algorithm 1. Upon starting, each replica starts initializes it's own state, that consists of:
 \begin{itemize}
 	\setlength\itemsep{0em}
-	\item \verb|membership|: Used to maintain the current membership of the system
-	\item \verb|currentlyAlive|, \verb|pendingMembership|, \verb|membershipTag|: Helper data structures for maintaining the membership of the system. (See \ref{sec:abdmenb}).
+	\item \verb|membership|: An HashSet, used to maintain the current membership of the system
+	\item \verb|currentlyAlive|, \verb|pendingMembership|, \verb|membershipTag|: Helper data structures (HashSets) for maintaining the membership of the system. (See \ref{sec:abdmenb}).
 	\item \verb|val|: Holds the key-value map to be replicated.
 	\item \verb|tag|: A key-value map that holds the tag associated with each key (See \ref{sec:abdrw})
 	\item \verb|inProgressOperations|: Holds the set operations that are currently in progress at a given instance.
 	\item \verb|pendingOperations|: A Queue that stores operations received by the application, but are yet to be executed.
-	\item \verb|opSeq|: Holds the current number of operations of this process.
+	\item \verb|opSeq|: An HashSet that holds the current number of operations of this process.
 \end{itemize}
-\par If a replica integrates the initial membership of the system, it just adds the other replicas to the the membership, becomes automatically ready execute any request made by either the application or other replicas. Otherwise, it joins by requesting to a contact to join the system, then, it has to wait until it's integrated to start participating in the quorum.
+\par If a replica integrates the initial membership of the system, it just adds the other replicas to the the membership, and updates it's \verb|ready| state to \verb|true|, meaning that it's immediately available to execute any request made by either the application or other replicas. Otherwise, it joins by requesting to a contact to join the system, then, it has to wait until it's integrated to start participating in the quorum. In the implementation we use a boolean to represent the \verb|ready| state of replica, however in the pseudocode this state is verified by checking weather the \verb|replicas| set was not initialized (is null or bottom).
 
 \subsubsection{Operations Queues}
 \label{sec:operatioQ}
-The Operation object serves as a wrapper for each individual request. It's defined as an abstract class, implemented by the \verb|ReadWriteOperation| class and the \verb|MembershipOperation| class. The \verb|ReadWriteOperation| class can hold any Read or Write request made by the application, and the \verb|MembershipOperation| class can hold a membership change requested by a replica. When receiving these requests, they are placed in the \verb|pendingOperations| queue. This queue is then accessed repeatedly, with a predefined interval by a timer method event that processes the first operation in the queue and execute it's respective request. In order to avoid having multiple operations (in the same replica) executing for the same key, \verb|inProgressOperations| holds the operations that are currently waiting to terminate.
-\par Effectively, we can have has many concurrent Read/Write operations as there are keys, however, to avoid overloading the CPU, we've created a mechanism that limits the amount of concurrent operations, by checking the current size of the \verb|inProgressOperations| set.
+The Operation object serves as a wrapper for each individual request. It's defined as an abstract class, implemented by the \verb|ReadWriteOperation| class and the \verb|MembershipOperation| class. The \verb|ReadWriteOperation| class represents any Read or Write request made by the application, and the \verb|MembershipOperation| class represents a membership change requested by a replica. When receiving these requests, they are placed in the \verb|pendingOperations| queue. This queue is then accessed repeatedly, with a predefined interval by a timer method event that processes the first operation in the queue and execute it's respective request.
+\par In order to avoid having multiple operations (in the same replica) executing for the same key, \verb|inProgressOperations| holds the operations that are currently waiting to terminate. Upon starting an operation, the replica verifies if the \verb|inProgressOperations| hashset already contains an operation for that key, if so, it wait's until that operation is completed.
+\par Effectively, we can have has many concurrent Read/Write operations as there are keys, however, to avoid overloading the CPU, we've created a mechanism that limits the amount of concurrent operations, by limiting the maximum size of the \verb|inProgressOperations| set.
+\par The objects and methods described in this subsection are not represented in the pseudo code as they're not part of the algorithm itself, but an improvement to handle multiple concurrent requests on different replicas.
 
 \subsubsection{Read Write Operations}
 \label{sec:abdrw}
-Read Write operations follow the pseudo code(TODO - link to pseudo code) presented.
+The description of these operations follows the pseudocode available in the appendix \ref{code:ABDSMRRW} Algorithm 2.
 \par \textbf{Write Operation}: The replica that receives the Write request (replica one), issues a request to all the other replicas to read the tag associated with a specific key, if the key is yet to be seen by any of the other replicas, it returns tag with a negative value. Replica one, upon reaching a quorum size of responses from the tags requested, it gets the maximum value from those tags, increments it, and sends a message to the other replicas to update their value and the tag associated with that key. The other replicas, when receiving this message, return an ack. Replica one, upon receiving these Acks and reaching a quorum, notifies the application that the write was complete.
-\par \textbf{Read Operations}: The replica that receives the Read request for a specific key (replica one), requests a read for that key from all the other replicas in the system, from which they send the value and it's respective tag. When replica one receives a quorum size of responses, selects the value with the higher tag and, sends a write request to the other replicas, ensuring that this value is propagated. Upon receiving the write request for the new value, these replicas update their state, and return an Ack. Replica one, upon receiving enough Acks to build a quorum, notifies the application that the read operation was complete and returns the most up to date value.
+\par \textbf{Read Operations}: The replica that receives the Read request for a specific key (replica one), requests a read for that key from all the other replicas in the system, from which they send the value and it's respective tag. When replica one receives a quorum size of responses, selects the value with the higher tag and, sends a write request to the other replicas, ensuring that this value is propagated. Upon receiving the write request for the new value, the other replicas update their state, and return an Ack. Replica one, upon receiving enough Acks to build a quorum, notifies the application that the read operation was complete and returns the most up to date value.
 
 \subsubsection{Membership Management}
 \label{sec:abdmenb}
-The Membership Management consists of either a replica joining or leaving the system. In contrast with the Read and Write requests, these requests are received from other replicas that detect changes in the membership, and they're all placed in the first position of the queue, additionally, they only start executing when there are no read or write requests in progress.
+The Membership Management consists of either a replica joining or leaving the system. In contrast with the Read and Write requests, these requests are received from other replicas that detect changes in the membership, and they're all placed in the first position of the queue, additionally, they only start executing when there are no read or write requests in progress. The pseudo code for the Membership Management is described in the appendix \ref{code:ABDSMR}, Algorithm 3 and Algorithm 4.
 \par \textbf{Joining the system}: When a replica is trying to join the system (replica two), it sends a Join Request to it's contact (replica one), that adds a request to add a new replica to the first position of the \verb|pendingOperations| queue. Replica one, upon starting the operation, it sends a message for other replicas to send their membership tags, upon receiving enough replies to make a quorum, replica one gets the biggest tag, increments it, and sends it alongside with the replica to be added to the membership. The other replicas, upon receiving the information of the new replica, place it in the \verb|pendingMembership| set, and return an Ack to replica one. When replica one has enough Acks to make a quorum, sends a message with the current membership information to replica two, that upon receiving that information, set it's \verb|ready| state to true, sends a message to all the replicas in the membership, which in turn, remove this replica from the \verb|pendingMembership| set and add it to the \verb|membership| set. Replica two is now ready to start participating in the quorum. Since reads and writes are propagated, there's no need to share state, because the replicas will always quorum and propagate the most recent value.
 \par \textbf{Leaving the System}:  Each replica periodically triggers a timer, configurable to a specific interval, that checks on all the other replicas. It does so, by sending a ping to every replica, then adds every replica that responds to the \verb|currentlyAlive|. When the timer triggers again, it checks if there are any replicas from the \verb|membership| set missing in the \verb|currentlyAlive| set, if so, adds the operation to remove the missing replicas to the first position of the \verb|pendingOperations| queue.
 \par The execution of this operation is the mostly the same from the operation of adding a new replica, however, when the other replicas receive the information to remove the replica, the replica gets removed immediately and an ack is sent. The replica who requested the Remove operation, waits for a quorum (already with one less element) and removes the replica as well.
@@ -427,10 +406,45 @@ Time-series analysis reveals interesting stability patterns. Multi-Paxos shows t
 \subsubsection{Summary}
 The experimental results demonstrate that both Multi-Paxos and ABD offer significant improvements over basic Paxos, with Multi-Paxos showing slightly better overall characteristics for balanced workloads. ABD proves particularly efficient for write operations, making it a strong candidate for write-heavy workloads.
 
+\section{Limitations and Future Work}
+\subsection{Paxos}
+Our current implementation, while functional, has several areas for potential improvement:
+\textbf{Operation Recovery After Leadership Change}
+Currently, when a new leader is elected, pending operations at the old leader are lost. A more robust implementation would include a mechanism to transfer pending operations to the new leader. This could be achieved by having replicas resend their pending operations to the new leader after receiving a LeaderDecidedNotification.
+\textbf{Automatic Failure Detection and Cleanup}
+While our implementation handles leader failure through the heartbeat mechanism, it lacks automatic cleanup of crashed replicas from the membership. Implementing this would require:
+\begin{itemize}
+  	\setlength\itemsep{0em}
+	\item A failure detection mechanism similar to the leader heartbeat
+	\item A consensus round to remove failed replicas
+	\item State cleanup for removed replicas
+\end{itemize}
+\textbf{Operation Processing Optimization}
+Our current implementation handles operation requests and their execution in the same thread/context - when a request arrives, the handler both processes the request and, if appropriate, executes the propose operation immediately. We attempted to separate these concerns by having request handlers only validate the request and add it to a pendingOperations queue, with a separate periodic timer responsible for processing this queue and executing the propose operations. However, this approach resulted in significant performance degradation compared to the immediate execution model, leading us to maintain the coupled implementation. The cause of this performance issue with the decoupled approach warrants further investigation.
+\textbf{Code and Data Structure Optimization}
+The current implementation has several redundant data structures and classes that could be consolidated:
+\begin{itemize}
+  	\setlength\itemsep{0em}
+	\item Merge similar message types (PaxosMessage variants)
+	\item Unify notification structures across protocols
+	\item Reduce code duplication in message handlers
+	\item Simplify state tracking across Agreement and SMR protocols
+\end{itemize}
+\textbf{Additional Improvements}
+Several other enhancements could be made to the system:
+\begin{itemize}
+  	\setlength\itemsep{0em}
+	\item Implement state transfer optimization to reduce the cost of bringing new replicas up-to-date
+	\item Implement snapshotting for faster recovery
+	\item Optimize the communication patterns between replicas
+\end{itemize}
+
+
 
 \appendix
 \onecolumn
 \section{ABD-based SMR}
+\label{code:ABDSMR}
 \begin{algorithm}
 	\caption{Key-Value Store Replication Using Majority Quorums (State \& Init)}
 	\begin{algorithmic}
@@ -466,11 +480,12 @@ The experimental results demonstrate that both Multi-Paxos and ABD offer signifi
 
 \appendix
 \begin{algorithm}
+  \label{code:ABDSMRRW}
 	\caption{Key-Value Store Replication Using Majority Quorums (Write \& Read)}
 	\begin{algorithmic}
 
 		\State \textbf{Upon write}(k, v) \textbf{do}:
-		\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+		\State \hspace{1em} \textbf{If} \textsc{$replicas \neq \bot$}:
 		\State \hspace{3em} $pending \leftarrow v$
 		\State \hspace{3em} $opSeq \leftarrow opSeq + 1$
 		\State \hspace{3em} $answers \leftarrow \{\}$
@@ -478,12 +493,12 @@ The experimental results demonstrate that both Multi-Paxos and ABD offer signifi
 					\State
 
 					\State \textbf{Upon bebBcastDeliver(READ-TAG, $id$, $k$ $\rangle$, $p$) do:}
-					\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+					\State \hspace{1em} \textbf{If} \textsc{$replicas \neq \bot$}:
 					\State \hspace{3em} \textbf{Send}(\textsc{Read-Tag-Reply}, $p$, $id$, $tag[k]$)
 					\State
 
 					\State \textbf{Upon Receive($\langle$ READ-TAG-REPLY, $id$, $tag$$\rangle$, $p$ ) do:}
-					\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+					\State \hspace{1em} \textbf{If} \textsc{$replicas \neq \bot$}:
 					\State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
 					\State \hspace{5em} $answers \leftarrow answers \cup \{\langle$ \textsc{Read-Tag-Reply}, $id$, $tag$ $\rangle\}$
 					\State \hspace{5em} \textbf{If} $|answers| = \frac{\#\Pi+1}{2} + 1$ \textbf{Then}
@@ -495,7 +510,7 @@ The experimental results demonstrate that both Multi-Paxos and ABD offer signifi
 					\State
 
 					\State \textbf{Upon bebBcastDeliver($\langle$ WRITE, $id$, $k$, $new\text{-}tag$, $v$ $\rangle$, $p$) do:}
-					\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+					\State \hspace{1em} \textbf{If} \textsc{$replicas \neq \bot$}:
 					\State \hspace{3em} \textbf{If} $new\text{-}tag > tag[k]$ \textbf{Then}
 					\State \hspace{5em} $tag[k] \leftarrow new\text{-}tag$
 					\State \hspace{5em} $val[k] \leftarrow v$
@@ -503,7 +518,7 @@ The experimental results demonstrate that both Multi-Paxos and ABD offer signifi
 					\State
 
 					\State \textbf{Upon Receive(\textsc{Ack}, $p$, $id$, $k$) do:}
-					\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+					\State \hspace{1em} \textbf{If} \textsc{$replicas \neq \bot$}:
 					\State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
 					\State \hspace{4em} $answers \leftarrow answers \cup \{\langle$ \textsc{Ack}, $id$ $\rangle\}$
 					\State \hspace{4em} \textbf{If} $|answers| = \frac{N+1}{2} + 1$ \textbf{Then}
@@ -515,7 +530,7 @@ The experimental results demonstrate that both Multi-Paxos and ABD offer signifi
 					\State
 
 					\State \textbf{Upon read}($k$) \textbf{do}:
-					\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+					\State \hspace{1em} \textbf{If} \textsc{$replicas \neq \bot$}:
 					\State \hspace{3em} $opSeq \leftarrow opSeq + 1$
 					\State \hspace{3em} $answers \leftarrow \{\}$
 					\State \hspace{3em} \textbf{Trigger} bebBcastSend($\langle$\textsc{Read}, $opSeq$, $k$$\rangle$)
@@ -527,7 +542,7 @@ The experimental results demonstrate that both Multi-Paxos and ABD offer signifi
 				\State
 
 				\State \textbf{Upon Receive($\langle$\textsc{Read-Reply}, $id$, $k$, $tag$, $v$$\rangle$, $p$) do:}
-				\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+				\State \hspace{1em} \textbf{If} \textsc{$replicas \neq \bot$}:
 				\State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
 				\State \hspace{4em} $answers \leftarrow answers \cup \{\langle$\textsc{Read-Reply}, $id$, $k$, $tag$, $v$$\rangle\}$
 					\State \hspace{4em} \textbf{If} $|answers| = \frac{\#\Pi}{2} + 1$ \textbf{Then}
@@ -595,7 +610,7 @@ The experimental results demonstrate that both Multi-Paxos and ABD offer signifi
 	\caption{Membership Management - Join \& Remove}
 	\begin{algorithmic}
 		\State \textbf{Upon ChangeMembership}(r, ADD) \textbf{do:}
-		\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+		\State \hspace{1em} \textbf{If} \textsc{$replicas \neq \bot$}:
 		\State \hspace{3em} $pending \leftarrow r$
 		\State \hspace{3em} $pendingMembership \leftarrow r$
 		\State \hspace{3em} $opSeq \leftarrow opSeq + 1$
@@ -604,12 +619,12 @@ The experimental results demonstrate that both Multi-Paxos and ABD offer signifi
 		\State
 
 		\State \textbf{Upon bebBcastDeliver(READ-TAG-MEMBERSHIP, $id$, ACTION$\rangle$, $p$) do:}
-		\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+		\State \hspace{1em} \textbf{If} \textsc{$replicas \neq \bot$}:
 		\State \hspace{3em} \textbf{Send}(\textsc{Read-Tag-Reply-Membership}, $p$ $\langle id, membershipTag, ACTION\rangle$)
 		\State
 
 		\State \textbf{Upon Receive($\langle$ READ-TAG-REPLY-MEMBERSHIP, $id$, $membershipTag$$, ACTION\rangle$, $p$) do:}
-		\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+		\State \hspace{1em} \textbf{If} \textsc{$replicas \neq \bot$}:
 		\State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
 		\State \hspace{4em} $answers \leftarrow answers \cup \{\langle$ \textsc{Read-Tag-Reply-Membership}, $id$, $tag$ $\rangle\}$
 		\State \hspace{4em} \textbf{If} $|answers| = \frac{\#\Pi+1}{2} + 1$ \textbf{Then}
