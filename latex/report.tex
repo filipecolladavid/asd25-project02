@@ -123,12 +123,12 @@ Universidade NOVA de Lisboa}
 
 \begin{document}
 
-\pagenumbering{arabic} 
+\pagenumbering{arabic}
 
 \maketitle
 
 \begin{abstract}
-In the world of distributed systems, ensuring consistent replication among machines is crucial to achieve better performance, scalability and fault tolerance, this replication is also known as state machine replication (SMR). There are multiple ways to solve SMR, in this report will be discussing an ABD based SMR implementation and Multi-Paxos. The goal of the report is to explore each of these approaches, point out their benefits and drawbacks. Identifying these tradeoffs is crucial for the development of robust and efficient systems that are adequate to solve a specific problem.
+	In the world of distributed systems, ensuring consistent replication among machines is crucial to achieve better performance, scalability and fault tolerance, this replication is also known as state machine replication (SMR). There are multiple ways to solve SMR, in this report will be discussing an ABD based SMR implementation and Multi-Paxos. The goal of the report is to explore each of these approaches, point out their benefits and drawbacks. Identifying these tradeoffs is crucial for the development of robust and efficient systems that are adequate to solve a specific problem.
 \end{abstract}
 
 \section{Introduction}
@@ -157,7 +157,7 @@ Multi-Paxos can be enhanced to handle membership changes automatically by treati
 
 \subsection{ABD}
 \label{sec:ABD}
-In the paper "Sharing Memory Robustly in Message-Passing Systems"\cite{abd} (also known as ABD - H. Attiya, A. Bar-Noy, D. Dolev), the authors explore the implementation of shared memory in message-passing systems, by presenting emulators that translate shared-memory algorithms to message-passing models, implementing wait-free, atomic, single-writer multi-reader registers in unreliable, asynchronous networks. This approach takes advantages of quorum based systems in order to achieve replication of a single register, it does so by ensuring that every write is propagated through the system, and that every read returns the most recent value in the system. 
+In the paper "Sharing Memory Robustly in Message-Passing Systems"\cite{abd} (also known as ABD - H. Attiya, A. Bar-Noy, D. Dolev), the authors explore the implementation of shared memory in message-passing systems, by presenting emulators that translate shared-memory algorithms to message-passing models, implementing wait-free, atomic, single-writer multi-reader registers in unreliable, asynchronous networks. This approach takes advantages of quorum based systems in order to achieve replication of a single register, it does so by ensuring that every write is propagated through the system, and that every read returns the most recent value in the system.
 \par It's easily adapted to multiple registers, by running several instances of ABD in parallel identified by a key, additionally we can also run instances of ABD to automatically manage the membership of the system.
 \par By changing the original protocol to account for multiple registers and handle membership change, we can achieve a SMR similar to Multi-Paxos(\ref{sec:MultiPaxos}), where membership is automatically managed via a series o mechanisms. These mechanisms will be expanded in the Implementation(\ref{sec:ABDImpl}) section of this report
 
@@ -174,39 +174,39 @@ The leader election mechanism in our Multi-Paxos implementation is built around 
 Leader nodes are configured to send heartbeat messages every \texttt{LEADER\_TIMEOUT/2} milliseconds (where \texttt{LEADER\_TIMEOUT} is set to 5000ms in the implementation). This is done through a periodic timer that triggers a heartbeat message to be sent to all other replicas in the membership:
 
 \begin{algorithm}[H]
-\begin{algorithmic}
-\If{isLeader}
-    \State heartbeatMessage $\leftarrow$ new HeartbeatMessage()
-    \ForAll{host $\in$ membership}
-        \If{!host.equals(self)}
-            \State sendMessage(heartbeatMessage, host)
-        \EndIf
-    \EndFor
-\EndIf
-\end{algorithmic}
+	\begin{algorithmic}
+		\If{isLeader}
+		\State heartbeatMessage $\leftarrow$ new HeartbeatMessage()
+		\ForAll{host $\in$ membership}
+		\If{!host.equals(self)}
+		\State sendMessage(heartbeatMessage, host)
+		\EndIf
+		\EndFor
+		\EndIf
+	\end{algorithmic}
 \end{algorithm}
 
 Follower nodes maintain a boolean flag \texttt{receivedHeartbeat} that is set to true whenever they receive a heartbeat message from the current leader. A periodic timer running every \texttt{LEADER\_TIMEOUT} milliseconds checks this flag. If no heartbeat was received during this period, the follower initiates a leader election by starting a new instance of Paxos consensus with a special leader election operation:
 
 \begin{algorithm}[H]
-\begin{algorithmic}
-\If{!isLeader \textbf{ and } !receivedHeartbeat}
-    \State startLeaderElection()
-    \State // Create new Paxos instance for leader election
-    \State // Propose self as the new leader
-\EndIf
-\State receivedHeartbeat $\leftarrow$ false
-\end{algorithmic}
+	\begin{algorithmic}
+		\If{!isLeader \textbf{ and } !receivedHeartbeat}
+		\State startLeaderElection()
+		\State // Create new Paxos instance for leader election
+		\State // Propose self as the new leader
+		\EndIf
+		\State receivedHeartbeat $\leftarrow$ false
+	\end{algorithmic}
 \end{algorithm}
 
-The leader election itself is conducted through a complete Paxos instance, where the proposed value is the identity of the new leader. This ensures all replicas agree on the new leader even in the presence of multiple concurrent leader elections. 
+The leader election itself is conducted through a complete Paxos instance, where the proposed value is the identity of the new leader. This ensures all replicas agree on the new leader even in the presence of multiple concurrent leader elections.
 
 When the Agreement protocol completes the Paxos consensus for leader election, each node's Agreement protocol will notify its local SMR protocol through a \texttt{LeaderDecidedNotification}. This notification triggers the following state changes in the SMR protocol:
 
 \begin{itemize}
-\item If the local node is the new leader, sets its \texttt{isLeader} flag to true and starts the heartbeat timer
-\item Updates its \texttt{currentLeader} reference
-\item If not the leader, establishes a connection to the new leader
+	\item If the local node is the new leader, sets its \texttt{isLeader} flag to true and starts the heartbeat timer
+	\item Updates its \texttt{currentLeader} reference
+	\item If not the leader, establishes a connection to the new leader
 \end{itemize}
 
 By using Paxos consensus for leader election, the system ensures that even with multiple nodes detecting leader failure simultaneously and proposing themselves as leaders, only one leader will be elected and acknowledged by all functioning replicas in the system.
@@ -218,116 +218,97 @@ When a new node wants to join the system, it sends a join request to its contact
 
 Before minimum quorum:
 \begin{itemize}
-\item The leader can immediately accept new nodes without running consensus
-\item The leader updates its membership list and sends a \texttt{StateTransferMessage} to the joining node
-\item The joining node becomes ready to participate after processing the \texttt{StateTransferMessage}
+	\item The leader can immediately accept new nodes without running consensus
+	\item The leader updates its membership list and sends a \texttt{StateTransferMessage} to the joining node
+	\item The joining node becomes ready to participate after processing the \texttt{StateTransferMessage}
 \end{itemize}
 
 After minimum quorum:
 \begin{itemize}
-\item The contact node forwards the join request to the current leader
-\item The leader creates a special join operation and initiates a Paxos instance
-\item Upon consensus completion, the leader sends a \texttt{StateTransferMessage} to the joining node
-\item The joining node becomes ready to participate after processing the \texttt{StateTransferMessage}
+	\item The contact node forwards the join request to the current leader
+	\item The leader creates a special join operation and initiates a Paxos instance
+	\item Upon consensus completion, the leader sends a \texttt{StateTransferMessage} to the joining node
+	\item The joining node becomes ready to participate after processing the \texttt{StateTransferMessage}
 \end{itemize}
 
 The \texttt{StateTransferMessage} contains the current membership list and the system state. When a node receives this message, it updates its local state and becomes ready to participate in the system:
 
 \begin{algorithm}[H]
-\begin{algorithmic}
-\Upon{ReceivedStateTransferMessage(msg, host)}
-   \If{!msg.getLeader().equals(self)}
-       \State this.membership $\leftarrow$ msg.getMembership()
-       \State this.applicationState $\leftarrow$ deserializeState(msg.getState())
-       \State this.readyOperationInstance $\leftarrow$ true
-   \EndIf
-\EndUpon
-\end{algorithmic}
+	\begin{algorithmic}
+		\Upon{ReceivedStateTransferMessage(msg, host)}
+		\If{!msg.getLeader().equals(self)}
+		\State this.membership $\leftarrow$ msg.getMembership()
+		\State this.applicationState $\leftarrow$ deserializeState(msg.getState())
+		\State this.readyOperationInstance $\leftarrow$ true
+		\EndIf
+		\EndUpon
+	\end{algorithmic}
 \end{algorithm}
 
 Each membership change is treated as a special operation that must be processed before any subsequent operations can be executed, ensuring consistency in the membership view across all replicas.
 
 
 \subsubsection{Consensus Implementation}
-The consensus implementation in our Multi-Paxos based system is handled by the Agreement protocol, which ensures all replicas agree on the ordering and execution of operations. The protocol follows the standard Multi-Paxos flow but incorporates special handling for both regular operations and membership changes.
-The core consensus logic is implemented through several key phases:
-\begin{itemize}
-\item \textbf{Prepare Phase}: When a proposer wants to propose a value, it first sends a PrepareMessage with a ballot number to all acceptors. The implementation handles this through the \texttt{uponPreparePaxosMessage} handler:
-\begin{algorithm}[H]
-\begin{algorithmic}
-\If{ballot >= paxosInstance.getBallot()}
-\State paxosInstance.setBallot(ballot)
-\State paxosInstance.setPromise(host, true)
-\State // Send Promise message back to proposer
-\EndIf
-\end{algorithmic}
-\end{algorithm}
-\item \textbf{Promise Phase}: Acceptors respond to prepare messages with promises, tracked in the \texttt{uponPromisePaxosMessage} handler. Once a quorum of promises is received, the proposer can move to the accept phase:
-\begin{algorithm}[H]
-\begin{algorithmic}
-\If{hasQuorum(paxosInstance.getPromises())}
-\State AcceptPaxosMessage acceptMsg = new AcceptPaxosMessage(
-\State \hspace{1em}paxosInstance.getId(),
-\State \hspace{1em}paxosInstance.getBallot(),
-\State \hspace{1em}msg.getOperationID())
-\State // Send Accept message to all replicas
-\EndIf
-\end{algorithmic}
-\end{algorithm}
-\item \textbf{Accept Phase}: The proposer sends accept messages with the proposed value. Acceptors validate the ballot number and respond with learn messages if they accept the proposal.
-\item \textbf{Learn Phase}: Once a quorum of learn messages is received, the value is considered decided. The Agreement protocol notifies the SMR through specific notifications:
-\begin{itemize}
-\item \texttt{DecidedNotification}: For regular operations
-\item \texttt{NodeDecidedNotification}: For membership changes
-\item \texttt{LeaderDecidedNotification}: For leader changes
-\end{itemize}
-\end{itemize}
+The consensus implementation optimizes for the common case of a stable leader while maintaining safety during leader changes:
+
+1. \textbf{Normal Operation (Stable Leader):}
+   \begin{itemize}
+   \item Leader skips Prepare phase and directly sends AcceptPaxosMessage to all replicas
+   \item Acceptors respond with LearnPaxosMessage
+   \item Decision reached after quorum of Learn messages
+   \end{itemize}
+
+2. \textbf{Leader Recovery:}
+   \begin{itemize}
+   \item New leader must start complete Paxos instance with Prepare phase
+   \item Sends PrepareMessage with higher ballot number
+   \item Collects Promise responses from quorum
+   \item Proceeds with Accept phase after quorum reached
+   \end{itemize}
+
+3. \textbf{Decision Processing:}
+   \begin{itemize}
+   \item Upon receiving a quorum of accepts, processes decision based on operation type
+   \item For leader election operations, updates leadership state and starts heartbeat if elected
+   \item For join operations, updates membership list with new node
+   \item For regular operations, triggers notification to SMR for execution 
+   \item All decisions update internal state and clean up operation metadata
+   \end{itemize}
 The implementation maintains all necessary state for each Paxos instance in a \texttt{PaxosInstance} class, which tracks:
 \begin{itemize}
-\item Ballot numbers
-\item Promise and accept quorums
-\item Instance type (REGULAR, JOIN, or LEADERELECTION)
-\item Proposed values
+	\item Ballot numbers
+	\item Promise and accept quorums
+	\item Instance type (REGULAR, JOIN, or LEADERELECTION)
+	\item Proposed values
 \end{itemize}
 When the Agreement protocol reaches consensus on an operation, it triggers the appropriate notification to the SMR protocol, which then executes the operation and updates its state.
 
 
 \subsubsection{Operation Processing}
-Operation processing in our Multi-Paxos based system begins when HashApp generates operation requests. These requests follow different paths depending on whether they are received by a leader or non-leader replica.
-When a replica receives an OrderRequest from HashApp, it first checks if it's ready to process operations and if the operation hasn't been previously decided:
-\begin{algorithm}[H]
-\begin{algorithmic}
-\If{!readyOperationInstance}
-\State return
-\EndIf
-\If{decidedOperations.contains(request.getOpId())}
-\State return
-\EndIf
-\end{algorithmic}
-\end{algorithm}
+Operation processing in our Multi-Paxos based system begins when HashApp generates operation requests. These requests follow different paths depending on whether they are received by a leader or non-leader replica. When a replica receives an OrderRequest from HashApp, it first checks if it's ready to process operations and if the operation hasn't been previously decided:
 If the replica is not the leader, it forwards the operation to the current leader via an OperationMessage:
 \begin{algorithm}[H]
-\begin{algorithmic}
-\If{!isLeader}
-\State OperationMessage msg = new OperationMessage(
-\State \hspace{1em}request.getOpId(), self,
-\State \hspace{1em}nextOperationInstance++,
-\State \hspace{1em}request.getOperation())
-\State openConnection(currentLeader)
-\State sendMessage(msg, currentLeader)
-\State return
-\EndIf
-\end{algorithmic}
+	\begin{algorithmic}
+		\If{!isLeader}
+		\State OperationMessage msg = new OperationMessage(
+		\State \hspace{1em}request.getOpId(), self,
+		\State \hspace{1em}nextOperationInstance++,
+		\State \hspace{1em}request.getOperation())
+		\State openConnection(currentLeader)
+		\State sendMessage(msg, currentLeader)
+		\State return
+		\EndIf
+	\end{algorithmic}
 \end{algorithm}
 If the replica is the leader, it proposes the operation through the Agreement protocol:
 \begin{algorithm}[H]
-\begin{algorithmic}
-\State ProposeRequest proposeRequest = new ProposeRequest(
-\State \hspace{1em}nextOperationInstance++,
-\State \hspace{1em}request.getOpId(),
-\State \hspace{1em}request.getOperation())
-\State sendRequest(proposeRequest, Agreement.PROTOCOLID)
-\end{algorithmic}
+	\begin{algorithmic}
+		\State ProposeRequest proposeRequest = new ProposeRequest(
+		\State \hspace{1em}nextOperationInstance++,
+		\State \hspace{1em}request.getOpId(),
+		\State \hspace{1em}request.getOperation())
+		\State sendRequest(proposeRequest, Agreement.PROTOCOLID)
+	\end{algorithmic}
 \end{algorithm}
 When an operation is decided, the Agreement protocol notifies the SMR through a DecidedNotification. Upon receiving this notification, the SMR:
 
@@ -346,45 +327,44 @@ Currently, when a new leader is elected, pending operations at the old leader ar
 \textbf{Automatic Failure Detection and Cleanup}
 While our implementation handles leader failure through the heartbeat mechanism, it lacks automatic cleanup of crashed replicas from the membership. Implementing this would require:
 \begin{itemize}
-\item A failure detection mechanism similar to the leader heartbeat
-\item A consensus round to remove failed replicas
-\item State cleanup for removed replicas
+	\item A failure detection mechanism similar to the leader heartbeat
+	\item A consensus round to remove failed replicas
+	\item State cleanup for removed replicas
 \end{itemize}
 \textbf{Operation Processing Optimization}
 Our current implementation handles operation requests and their execution in the same thread/context - when a request arrives, the handler both processes the request and, if appropriate, executes the propose operation immediately. We attempted to separate these concerns by having request handlers only validate the request and add it to a pendingOperations queue, with a separate periodic timer responsible for processing this queue and executing the propose operations. However, this approach resulted in significant performance degradation compared to the immediate execution model, leading us to maintain the coupled implementation. The cause of this performance issue with the decoupled approach warrants further investigation.
 \textbf{Code and Data Structure Optimization}
 The current implementation has several redundant data structures and classes that could be consolidated:
 \begin{itemize}
-\item Merge similar message types (PaxosMessage variants)
-\item Unify notification structures across protocols
-\item Reduce code duplication in message handlers
-\item Simplify state tracking across Agreement and SMR protocols
+	\item Merge similar message types (PaxosMessage variants)
+	\item Unify notification structures across protocols
+	\item Reduce code duplication in message handlers
+	\item Simplify state tracking across Agreement and SMR protocols
 \end{itemize}
 \textbf{Additional Improvements}
 Several other enhancements could be made to the system:
 \begin{itemize}
-\item Implement state transfer optimization to reduce the cost of bringing new replicas up-to-date
-\item Add mechanisms to prevent unbounded growth of operation history
-\item Implement snapshotting for faster recovery
-\item Optimize the communication patterns between replicas
+	\item Implement state transfer optimization to reduce the cost of bringing new replicas up-to-date
+	\item Implement snapshotting for faster recovery
+	\item Optimize the communication patterns between replicas
 \end{itemize}
 
 
 \subsection{ABD based SMR}
 \label{sec:ABDImpl}
-The implementation of state machine replication using quorums is essentially multiple ABD instances running in parallel with different objectives guaranteeing serialisability of each individual key or each membership change in the system. These objectives are defined in our implementation as \textbf{Operations} (Read Write Operation and Membership Operation). This implementation also assumes that the system always starts with three initial replicas (initial membership), but can handle memberships joining afterwards or leaving. Additionally, the system works as intended as long as three replicas remain in it. 
+The implementation of state machine replication using quorums is essentially multiple ABD instances running in parallel with different objectives guaranteeing serialisability of each individual key or each membership change in the system. These objectives are defined in our implementation as \textbf{Operations} (Read Write Operation and Membership Operation). This implementation also assumes that the system always starts with three initial replicas (initial membership), but can handle memberships joining afterwards or leaving. Additionally, the system works as intended as long as three replicas remain in it.
 \subsubsection{Initialization}
 \label{sec:initABD}
 Upon starting, each replica starts initializes it's own state, that consists of:
 \begin{itemize}
-\setlength\itemsep{0em}
-  \item \verb|membership|: Used to maintain the current membership of the system
-  \item \verb|currentlyAlive|, \verb|pendingMembership|, \verb|membershipTag|: Helper data structures for maintaining the membership of the system. (See \ref{sec:abdmenb}).
-  \item \verb|val|: Holds the key-value map to be replicated.
-  \item \verb|tag|: A key-value map that holds the tag associated with each key (See \ref{sec:abdrw})
-  \item \verb|inProgressOperations|: Holds the set operations that are currently in progress at a given instance.
-  \item \verb|pendingOperations|: A Queue that stores operations received by the application, but are yet to be executed.
-  \item \verb|opSeq|: Holds the current number of operations of this process.
+	\setlength\itemsep{0em}
+	\item \verb|membership|: Used to maintain the current membership of the system
+	\item \verb|currentlyAlive|, \verb|pendingMembership|, \verb|membershipTag|: Helper data structures for maintaining the membership of the system. (See \ref{sec:abdmenb}).
+	\item \verb|val|: Holds the key-value map to be replicated.
+	\item \verb|tag|: A key-value map that holds the tag associated with each key (See \ref{sec:abdrw})
+	\item \verb|inProgressOperations|: Holds the set operations that are currently in progress at a given instance.
+	\item \verb|pendingOperations|: A Queue that stores operations received by the application, but are yet to be executed.
+	\item \verb|opSeq|: Holds the current number of operations of this process.
 \end{itemize}
 \par If a replica integrates the initial membership of the system, it just adds the other replicas to the the membership, becomes automatically ready execute any request made by either the application or other replicas. Otherwise, it joins by requesting to a contact to join the system, then, it has to wait until it's integrated to start participating in the quorum.
 
@@ -414,34 +394,34 @@ The Membership Management consists of either a replica joining or leaving the sy
 The experimental evaluation was conducted in a distributed environment using three nodes deployed in a cluster configuration. Each test scenario involved executing 5,000, 10,000, and 20,000 operations with a balanced mix of reads and writes. We compared three different consensus protocols: basic Paxos, Multi-Paxos, and ABD (Attiya, Bar-Noy, Dolev). All tests were performed with consistent parameters including quorum size (2 out of 3 nodes) and network conditions.
 \subsubsection{Overall Throughput}
 \begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.45\textwidth]{figures/throughput.pdf}
-    \caption{Overall Throughput Comparison (5K operations)}
-    \label{fig:throughput}
+	\centering
+	\includegraphics[width=0.45\textwidth]{figures/throughput.pdf}
+	\caption{Overall Throughput Comparison (5K operations)}
+	\label{fig:throughput}
 \end{figure}
 The throughput analysis reveals significant performance differences among the protocols. Multi-Paxos and ABD demonstrate similar throughput capabilities (70.93 and 71.77 ops/sec respectively), both substantially outperforming basic Paxos (50.89 ops/sec). This performance gap can be attributed to the reduced message complexity in both Multi-Paxos and ABD compared to basic Paxos. The similarity between Multi-Paxos and ABD throughput suggests that both protocols effectively optimize their communication patterns for sustained operation.
 \subsubsection{Latency Distribution}
 \begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.45\textwidth]{figures/latency.pdf}
-    \caption{Latency Distribution by Protocol}
-    \label{fig:latency}
+	\centering
+	\includegraphics[width=0.45\textwidth]{figures/latency.pdf}
+	\caption{Latency Distribution by Protocol}
+	\label{fig:latency}
 \end{figure}
 Latency measurements show distinct characteristics for each protocol. Basic Paxos exhibits the highest latencies (read: $48,245~\mu\text{s}$, write: $48,444~\mu\text{s}$), while Multi-Paxos achieves the most balanced and lowest overall latencies (read: $31,977~\mu\text{s}$, write: $31,357~\mu\text{s}$). ABD shows an interesting asymmetric pattern with excellent write latency ($30,313~\mu\text{s}$) but higher read latency ($37,825~\mu\text{s}$). This asymmetry in ABD reflects its protocol design, which optimizes for write operations at the cost of slightly higher read complexity.
 \subsubsection{Network Communication Efficiency}
 \begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.45\textwidth]{figures/network.pdf}
-    \caption{Network Communication Efficiency}
-    \label{fig:network}
+	\centering
+	\includegraphics[width=0.45\textwidth]{figures/network.pdf}
+	\caption{Network Communication Efficiency}
+	\label{fig:network}
 \end{figure}
 The network efficiency analysis highlights the messaging overhead of each protocol. Basic Paxos requires 4 messages per operation, resulting in approximately 20,000 messages for 5,000 operations. Multi-Paxos achieves the best efficiency with 2 messages per operation (10,000 total messages) after leader election. ABD maintains a middle ground with 3 messages per operation on average (15,000 total messages). This metric directly correlates with the observed throughput performance, demonstrating how message complexity impacts overall system efficiency.
 \subsubsection{Performance Over Time}
 \begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.45\textwidth]{figures/performance.pdf}
-    \caption{Performance Over Time}
-    \label{fig:performance}
+	\centering
+	\includegraphics[width=0.45\textwidth]{figures/performance.pdf}
+	\caption{Performance Over Time}
+	\label{fig:performance}
 \end{figure}
 Time-series analysis reveals interesting stability patterns. Multi-Paxos shows the most stable performance, maintaining consistent throughput around 120 ops/sec during peak operation. ABD demonstrates good stability but with lower peak throughput (around 90 ops/sec), while basic Paxos stabilizes at the lowest level (around 67 ops/sec). All protocols show some initial ramp-up period, with Multi-Paxos achieving optimal performance fastest.
 \subsubsection{Summary}
@@ -452,229 +432,229 @@ The experimental results demonstrate that both Multi-Paxos and ABD offer signifi
 \onecolumn
 \section{ABD-based SMR}
 \begin{algorithm}
-  \caption{Key-Value Store Replication Using Majority Quorums (State \& Init)}
-  \begin{algorithmic}
-  \State \textbf{Interface:}
-  \State \hspace{1em} \textbf{Requests:}
-  \State \hspace{2em} \texttt{write}(k, v) {where $k$ is the key, $v$ is the value}
-  \State \hspace{2em} \texttt{read} {where $k$ is the key}
-  \State \hspace{1em} \textbf{Indications:}
-  \State \hspace{2em} \texttt{writeOK}(k)
-  \State \hspace{2em} \texttt{readOK}(k, v)
-  \State
-  \State \textbf{State:}
-  \State \hspace{1em} $replicas$ {set containing all replicas}
-  \State \hspace{1em} $myself$ {unique index of this replica}
-  \State \hspace{1em} $tag$ {set with timestamps - pair (sequenceNumb, process) - per keys}
-  \State \hspace{1em} $val$ {set of values for every key $k$, initially $\perp$}
-  \State \hspace{1em} $opSeq$ {unique sequence number for operations at this process}
-  \State \hspace{1em} $answers$ {set containing reply messages}
-  \State \hspace{1em} $pending$ {pending value to be written}
-  \State
-  \State \textbf{Upon Init() do:}
-  \State \hspace{1em} \textbf{If} \textsc{isInitialMembership()}:
-  \State \hspace{3em} $replicas \leftarrow \Pi$
-  \State \hspace{1em} \textbf{Else}:
-  \State \hspace{3em} $replicas \leftarrow \bot$
-  \State \hspace{1em} $myself \leftarrow \texttt{mySequence}(\text{replicas})$
-  \State \hspace{1em} $tag \leftarrow \{\}$
-  \State \hspace{1em} $val \leftarrow \{\}$
-  \State \hspace{1em} $opSeq \leftarrow 0$
-  \State \hspace{1em} $pending \leftarrow \perp$
-  \end{algorithmic}
-  \end{algorithm}
+	\caption{Key-Value Store Replication Using Majority Quorums (State \& Init)}
+	\begin{algorithmic}
+		\State \textbf{Interface:}
+		\State \hspace{1em} \textbf{Requests:}
+		\State \hspace{2em} \texttt{write}(k, v) {where $k$ is the key, $v$ is the value}
+		\State \hspace{2em} \texttt{read} {where $k$ is the key}
+		\State \hspace{1em} \textbf{Indications:}
+		\State \hspace{2em} \texttt{writeOK}(k)
+		\State \hspace{2em} \texttt{readOK}(k, v)
+		\State
+		\State \textbf{State:}
+		\State \hspace{1em} $replicas$ {set containing all replicas}
+		\State \hspace{1em} $myself$ {unique index of this replica}
+		\State \hspace{1em} $tag$ {set with timestamps - pair (sequenceNumb, process) - per keys}
+		\State \hspace{1em} $val$ {set of values for every key $k$, initially $\perp$}
+		\State \hspace{1em} $opSeq$ {unique sequence number for operations at this process}
+		\State \hspace{1em} $answers$ {set containing reply messages}
+		\State \hspace{1em} $pending$ {pending value to be written}
+		\State
+		\State \textbf{Upon Init() do:}
+		\State \hspace{1em} \textbf{If} \textsc{isInitialMembership()}:
+		\State \hspace{3em} $replicas \leftarrow \Pi$
+		\State \hspace{1em} \textbf{Else}:
+		\State \hspace{3em} $replicas \leftarrow \bot$
+		\State \hspace{1em} $myself \leftarrow \texttt{mySequence}(\text{replicas})$
+		\State \hspace{1em} $tag \leftarrow \{\}$
+		\State \hspace{1em} $val \leftarrow \{\}$
+		\State \hspace{1em} $opSeq \leftarrow 0$
+		\State \hspace{1em} $pending \leftarrow \perp$
+	\end{algorithmic}
+\end{algorithm}
 
-  \appendix
-  \begin{algorithm}
-    \caption{Key-Value Store Replication Using Majority Quorums (Write \& Read)}
-    \begin{algorithmic}
-    
-    \State \textbf{Upon write}(k, v) \textbf{do}:
-    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
-    \State \hspace{3em} $pending \leftarrow v$
-    \State \hspace{3em} $opSeq \leftarrow opSeq + 1$
-    \State \hspace{3em} $answers \leftarrow \{\}$
-    \State \hspace{3em} Trigger bebBcastSend($\langle$READ-TAG, $opSeq$, $k$$\rangle$)
-    \State
-
-    \State \textbf{Upon bebBcastDeliver(READ-TAG, $id$, $k$ $\rangle$, $p$) do:}
-    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
-    \State \hspace{3em} \textbf{Send}(\textsc{Read-Tag-Reply}, $p$, $id$, $tag[k]$)
-    \State
-
-    \State \textbf{Upon Receive($\langle$ READ-TAG-REPLY, $id$, $tag$$\rangle$, $p$ ) do:}
-    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
-    \State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
-    \State \hspace{5em} $answers \leftarrow answers \cup \{\langle$ \textsc{Read-Tag-Reply}, $id$, $tag$ $\rangle\}$
-    \State \hspace{5em} \textbf{If} $|answers| = \frac{\#\Pi+1}{2} + 1$ \textbf{Then}
-    \State \hspace{6em} $new\text{-}tag \leftarrow$ \texttt{maxSQTag}($answers$)
-    \State \hspace{6em} $opSeq \leftarrow opSeq + 1$
-    \State \hspace{6em} $answers \leftarrow \{\}$
-    \State \hspace{6em} \textbf{Trigger} bebBcastSend($\langle$ \textsc{Write}, $opSeq$, $k$, $\langle new\text{-}tag + 1$, $myself \rangle$, $pending$ $\rangle$)
-    \State \hspace{6em} $pending \leftarrow \perp$
-    \State
-    
-    \State \textbf{Upon bebBcastDeliver($\langle$ WRITE, $id$, $k$, $new\text{-}tag$, $v$ $\rangle$, $p$) do:}
-    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
-    \State \hspace{3em} \textbf{If} $new\text{-}tag > tag[k]$ \textbf{Then}
-    \State \hspace{5em} $tag[k] \leftarrow new\text{-}tag$
-    \State \hspace{5em} $val[k] \leftarrow v$
-    \State \hspace{3em} \textbf{Send}(\textsc{Ack}, $p$, $id$, $k$)
-    \State
-    
-    \State \textbf{Upon Receive(\textsc{Ack}, $p$, $id$, $k$) do:}
-    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
-    \State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
-    \State \hspace{4em} $answers \leftarrow answers \cup \{\langle$ \textsc{Ack}, $id$ $\rangle\}$
-    \State \hspace{4em} \textbf{If} $|answers| = \frac{N+1}{2} + 1$ \textbf{Then}
-    \State \hspace{5em} $answers \leftarrow \{\}$
-    \State \hspace{5em} \textbf{If} $pending = \perp$ \textbf{Then}
-    \State \hspace{6em} \textbf{Trigger WriteOK}($k$)
-    \State \hspace{5em} \textbf{Else:}
-    \State \hspace{6em} \textbf{Trigger ReadOK}($k$, \textbf{$pending$})
-    \State
-
-    \State \textbf{Upon read}($k$) \textbf{do}:
-    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
-    \State \hspace{3em} $opSeq \leftarrow opSeq + 1$
-    \State \hspace{3em} $answers \leftarrow \{\}$
-    \State \hspace{3em} \textbf{Trigger} bebBcastSend($\langle$\textsc{Read}, $opSeq$, $k$$\rangle$)
-    \State
-
-    \State \textbf{Upon bebBcastDeliver ($\langle$\textsc{Read}, $id$, $k$$\rangle$, $p$) do:}
-    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
-    \State \hspace{3em} \textbf{Send}(\textsc{Read-Reply}, $p$, $id$, $k$, $tag[k]$, $val[k]$)
-    \State
-
-    \State \textbf{Upon Receive($\langle$\textsc{Read-Reply}, $id$, $k$, $tag$, $v$$\rangle$, $p$) do:}
-    \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
-    \State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
-    \State \hspace{4em} $answers \leftarrow answers \cup \{\langle$\textsc{Read-Reply}, $id$, $k$, $tag$, $v$$\rangle\}$
-    \State \hspace{4em} \textbf{If} $|answers| = \frac{\#\Pi}{2} + 1$ \textbf{Then}
-    \State \hspace{5em} $tag \leftarrow$ \texttt{maxTag}($answers$)
-    \State \hspace{5em} $pending \leftarrow$ \texttt{valueOfMaxTag}($answers$)
-    \State \hspace{5em} $opSeq \leftarrow opSeq + 1$
-    \State \hspace{5em} $answers \leftarrow \{\}$
-    \State \hspace{5em} \textbf{Trigger} bebBcastSend($\langle$\textsc{Write}, $opSeq$, $k$, $tag$, $pending$$\rangle$)
-    \end{algorithmic}
-  \end{algorithm}
-  
+\appendix
 \begin{algorithm}
-    \caption{Membership Management - State, Init() \& Timer}
-    \begin{algorithmic}
-        \State \textbf{Interface:}
-        \State \hspace{1em} \textbf{Requests:}
-        \State \hspace{2em} \texttt{ChangeMembership}( $r$ , ACTION) //{where $r$ is the replica identifier and ACTION = \{ADD, REMOVE\}}
-        \State
-        \State \textbf{State:}
-        \State \hspace{1em} $replicas$ {set containing all replicas}
-        \State \hspace{1em} $currentlyAlive$ {set containing replicas currently active between timers}
-        \State \hspace{1em} $pendingMembership$ {replica waiting to join }
-        \State \hspace{1em} $myself$ {unique index of this replica}
-        \State \hspace{1em} $membershipTag$ {set with timestamps - pair (sequenceNumb, process)}
-        \State \hspace{1em} $opSeq$ {unique sequence number for operations at this process}
-        \State \hspace{1em} $answers$ {set containing reply messages}
-        \State \hspace{1em} $pending$ {pending value to be written}
-        \State \hspace{1em} $T$ {period between healthchecks}
-        \State
+	\caption{Key-Value Store Replication Using Majority Quorums (Write \& Read)}
+	\begin{algorithmic}
 
-        \State \textbf{Upon Init() do:}
-        \State \hspace{1em} \textbf{If} \textsc{isInitialMembership()}:
-        \State \hspace{3em} $replicas \leftarrow \Pi$
-        \State \hspace{1em} \textbf{Else}:
-        \State \hspace{3em} $replicas \leftarrow \bot$
-        \State \hspace{1em} $currentlyAlive \leftarrow replicas$
-        \State \hspace{1em} $myself \leftarrow \texttt{mySequence}(\text{replicas})$
-        \State \hspace{1em} $tag \leftarrow \{\}$
-        \State \hspace{1em} $val \leftarrow \{\}$
-        \State \hspace{1em} $opSeq \leftarrow 0$
-        \State \hspace{1em} $pending \leftarrow \perp$
-        \State \hspace{1em} \textbf{Setup Periodic Timer} HealthCheck($T$)
-        \State
+		\State \textbf{Upon write}(k, v) \textbf{do}:
+		\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+		\State \hspace{3em} $pending \leftarrow v$
+		\State \hspace{3em} $opSeq \leftarrow opSeq + 1$
+		\State \hspace{3em} $answers \leftarrow \{\}$
+		\State \hspace{3em} Trigger bebBcastSend($\langle$READ-TAG, $opSeq$, $k$$\rangle$)
+					\State
 
-        \State \textbf{Upon Timer } HealthCheck \textbf{ do:}
-        \State \hspace{1em} \textbf{If} $\#replicas \neq \#currentlyAlive$ \textbf{Then}
-        \State \hspace{3em} \textbf{Trigger} bebBcastSend(READ-TAG-MEMBERSHIP, $currentlyAlive, \langle opSeq, REMOVE\rangle$)
-        \State \hspace{1em} \textbf{Else}
-        \State \hspace{3em} \textbf{Trigger} bebBcastSend(Ping, $replicas$)
-        \State \hspace{1em} $currentlyAlive \leftarrow \{\}$
-        \State
+					\State \textbf{Upon bebBcastDeliver(READ-TAG, $id$, $k$ $\rangle$, $p$) do:}
+					\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+					\State \hspace{3em} \textbf{Send}(\textsc{Read-Tag-Reply}, $p$, $id$, $tag[k]$)
+					\State
 
-        \State \textbf{Upon Ping}($p$) \textbf{do:}
-        \State \hspace{3em} \textbf{Send}(Pong, $p$)
-        \State
-        
+					\State \textbf{Upon Receive($\langle$ READ-TAG-REPLY, $id$, $tag$$\rangle$, $p$ ) do:}
+					\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+					\State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
+					\State \hspace{5em} $answers \leftarrow answers \cup \{\langle$ \textsc{Read-Tag-Reply}, $id$, $tag$ $\rangle\}$
+					\State \hspace{5em} \textbf{If} $|answers| = \frac{\#\Pi+1}{2} + 1$ \textbf{Then}
+					\State \hspace{6em} $new\text{-}tag \leftarrow$ \texttt{maxSQTag}($answers$)
+					\State \hspace{6em} $opSeq \leftarrow opSeq + 1$
+					\State \hspace{6em} $answers \leftarrow \{\}$
+					\State \hspace{6em} \textbf{Trigger} bebBcastSend($\langle$ \textsc{Write}, $opSeq$, $k$, $\langle new\text{-}tag + 1$, $myself \rangle$, $pending$ $\rangle$)
+					\State \hspace{6em} $pending \leftarrow \perp$
+					\State
 
-        \State \textbf{Upon Pong}($p$) \textbf{do:}
-        \State \hspace{3em} $currentlyAlive \leftarrow currentlyAlive \cup p$
-        \State
-    \end{algorithmic}
+					\State \textbf{Upon bebBcastDeliver($\langle$ WRITE, $id$, $k$, $new\text{-}tag$, $v$ $\rangle$, $p$) do:}
+					\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+					\State \hspace{3em} \textbf{If} $new\text{-}tag > tag[k]$ \textbf{Then}
+					\State \hspace{5em} $tag[k] \leftarrow new\text{-}tag$
+					\State \hspace{5em} $val[k] \leftarrow v$
+					\State \hspace{3em} \textbf{Send}(\textsc{Ack}, $p$, $id$, $k$)
+					\State
+
+					\State \textbf{Upon Receive(\textsc{Ack}, $p$, $id$, $k$) do:}
+					\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+					\State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
+					\State \hspace{4em} $answers \leftarrow answers \cup \{\langle$ \textsc{Ack}, $id$ $\rangle\}$
+					\State \hspace{4em} \textbf{If} $|answers| = \frac{N+1}{2} + 1$ \textbf{Then}
+					\State \hspace{5em} $answers \leftarrow \{\}$
+					\State \hspace{5em} \textbf{If} $pending = \perp$ \textbf{Then}
+					\State \hspace{6em} \textbf{Trigger WriteOK}($k$)
+					\State \hspace{5em} \textbf{Else:}
+					\State \hspace{6em} \textbf{Trigger ReadOK}($k$, \textbf{$pending$})
+					\State
+
+					\State \textbf{Upon read}($k$) \textbf{do}:
+					\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+					\State \hspace{3em} $opSeq \leftarrow opSeq + 1$
+					\State \hspace{3em} $answers \leftarrow \{\}$
+					\State \hspace{3em} \textbf{Trigger} bebBcastSend($\langle$\textsc{Read}, $opSeq$, $k$$\rangle$)
+				\State
+
+				\State \textbf{Upon bebBcastDeliver ($\langle$\textsc{Read}, $id$, $k$$\rangle$, $p$) do:}
+				\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+				\State \hspace{3em} \textbf{Send}(\textsc{Read-Reply}, $p$, $id$, $k$, $tag[k]$, $val[k]$)
+				\State
+
+				\State \textbf{Upon Receive($\langle$\textsc{Read-Reply}, $id$, $k$, $tag$, $v$$\rangle$, $p$) do:}
+				\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+				\State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
+				\State \hspace{4em} $answers \leftarrow answers \cup \{\langle$\textsc{Read-Reply}, $id$, $k$, $tag$, $v$$\rangle\}$
+					\State \hspace{4em} \textbf{If} $|answers| = \frac{\#\Pi}{2} + 1$ \textbf{Then}
+					\State \hspace{5em} $tag \leftarrow$ \texttt{maxTag}($answers$)
+					\State \hspace{5em} $pending \leftarrow$ \texttt{valueOfMaxTag}($answers$)
+					\State \hspace{5em} $opSeq \leftarrow opSeq + 1$
+					\State \hspace{5em} $answers \leftarrow \{\}$
+					\State \hspace{5em} \textbf{Trigger} bebBcastSend($\langle$\textsc{Write}, $opSeq$, $k$, $tag$, $pending$$\rangle$)
+	\end{algorithmic}
 \end{algorithm}
 
 \begin{algorithm}
-    \caption{Membership Management - Join \& Remove}
-    \begin{algorithmic}        
-        \State \textbf{Upon ChangeMembership}(r, ADD) \textbf{do:}
-        \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
-        \State \hspace{3em} $pending \leftarrow r$
-        \State \hspace{3em} $pendingMembership \leftarrow r$
-        \State \hspace{3em} $opSeq \leftarrow opSeq + 1$
-        \State \hspace{3em} $answers \leftarrow \{\}$
-        \State \hspace{3em} Trigger bebBcastSend(READ-TAG-MEMBERSHIP, $replicas, \langle opSeq, ADD\rangle$)
-        \State
+	\caption{Membership Management - State, Init() \& Timer}
+	\begin{algorithmic}
+		\State \textbf{Interface:}
+		\State \hspace{1em} \textbf{Requests:}
+		\State \hspace{2em} \texttt{ChangeMembership}( $r$ , ACTION) //{where $r$ is the replica identifier and ACTION = \{ADD, REMOVE\}}
+		\State
+		\State \textbf{State:}
+		\State \hspace{1em} $replicas$ {set containing all replicas}
+		\State \hspace{1em} $currentlyAlive$ {set containing replicas currently active between timers}
+		\State \hspace{1em} $pendingMembership$ {replica waiting to join }
+		\State \hspace{1em} $myself$ {unique index of this replica}
+		\State \hspace{1em} $membershipTag$ {set with timestamps - pair (sequenceNumb, process)}
+		\State \hspace{1em} $opSeq$ {unique sequence number for operations at this process}
+		\State \hspace{1em} $answers$ {set containing reply messages}
+		\State \hspace{1em} $pending$ {pending value to be written}
+		\State \hspace{1em} $T$ {period between healthchecks}
+		\State
 
-        \State \textbf{Upon bebBcastDeliver(READ-TAG-MEMBERSHIP, $id$, ACTION$\rangle$, $p$) do:}
-        \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
-        \State \hspace{3em} \textbf{Send}(\textsc{Read-Tag-Reply-Membership}, $p$ $\langle id, membershipTag, ACTION\rangle$)
-        \State
+		\State \textbf{Upon Init() do:}
+		\State \hspace{1em} \textbf{If} \textsc{isInitialMembership()}:
+		\State \hspace{3em} $replicas \leftarrow \Pi$
+		\State \hspace{1em} \textbf{Else}:
+		\State \hspace{3em} $replicas \leftarrow \bot$
+		\State \hspace{1em} $currentlyAlive \leftarrow replicas$
+		\State \hspace{1em} $myself \leftarrow \texttt{mySequence}(\text{replicas})$
+		\State \hspace{1em} $tag \leftarrow \{\}$
+		\State \hspace{1em} $val \leftarrow \{\}$
+		\State \hspace{1em} $opSeq \leftarrow 0$
+		\State \hspace{1em} $pending \leftarrow \perp$
+		\State \hspace{1em} \textbf{Setup Periodic Timer} HealthCheck($T$)
+		\State
 
-        \State \textbf{Upon Receive($\langle$ READ-TAG-REPLY-MEMBERSHIP, $id$, $membershipTag$$, ACTION\rangle$, $p$) do:}
-        \State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
-        \State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
-        \State \hspace{4em} $answers \leftarrow answers \cup \{\langle$ \textsc{Read-Tag-Reply-Membership}, $id$, $tag$ $\rangle\}$
-        \State \hspace{4em} \textbf{If} $|answers| = \frac{\#\Pi+1}{2} + 1$ \textbf{Then}
-        \State \hspace{5em} $new\text{-}tag \leftarrow$ \texttt{maxSQTag}($answers$)
-        \State \hspace{5em} $opSeq \leftarrow opSeq + 1$
-        \State \hspace{5em} $answers \leftarrow \{\}$
-        \State \hspace{5em} \textbf{Trigger} bebBcastSend(\textsc{WriteMembership}, $replicas \langle, opSeq$, $\langle new\text{-}tag + 1$, $myself \rangle$, $pending$, ACTION$\rangle$)
-        \State \hspace{5em} $pending \leftarrow \perp$
-        \State
+		\State \textbf{Upon Timer } HealthCheck \textbf{ do:}
+		\State \hspace{1em} \textbf{If} $\#replicas \neq \#currentlyAlive$ \textbf{Then}
+		\State \hspace{3em} \textbf{Trigger} bebBcastSend(READ-TAG-MEMBERSHIP, $currentlyAlive, \langle opSeq, REMOVE\rangle$)
+		\State \hspace{1em} \textbf{Else}
+		\State \hspace{3em} \textbf{Trigger} bebBcastSend(Ping, $replicas$)
+		\State \hspace{1em} $currentlyAlive \leftarrow \{\}$
+		\State
 
-        \State \textbf{Upon bebBcastDeliver($\langle$ WRITEMEMBERSHIP, $id$, $new\text{-}tag$, $r$, ACTION $\rangle$, $p$) do:}
-        \State \hspace{1em} \textbf{If} $new\text{-}tag > tag$ \textbf{Then}
-        \State \hspace{2em} \textbf{If} $ACTION = ADD$ \textbf{Then}
-        \State \hspace{3em} $membershipTag \leftarrow new\text{-}tag$
-        \State \hspace{3em} $pendingMembership \leftarrow r$
-        \State \hspace{2em} \textbf{Else}
-        \State \hspace{3em} $replicas \leftarrow replicas \setminus \{pendingMembership\}$
-        \State \hspace{1em} \textbf{Send}($\langle$ \textsc{MembershipAck}, $p$, $id$ $\rangle$)
-        \State
-
-        \State \textbf{Upon Receive($\langle$ \textsc{MembershipAck}, $p$, $id$, ACTION $\rangle$) do:}
-        \State \hspace{1em} \textbf{If} $opSeq = id$ \textbf{Then}
-        \State \hspace{2em} $answers \leftarrow answers \cup \{\langle$ \textsc{Ack}, $id$ $\rangle\}$
-        \State \hspace{2em} \textbf{If} $|answers| = \frac{N+1}{2} + 1$ \textbf{Then}
-        \State \hspace{3em} $answers \leftarrow \{\}$
-        \State \hspace{3em} \textbf{If} $pending = \perp$ \textbf{Then}
-        \State \hspace{4em} \textbf{If} $ACTION = ADD$ \textbf{Then}
-        \State \hspace{5em} \textbf{Send}($\langle$\textsc{JoinReply}, $pendingMembership$, $membershipTag$, $replicas$ $\rangle$)
-        \State \hspace{4em} \textbf{Else}
-        \State \hspace{5em} $replicas \leftarrow replicas \setminus \{pendingMembership\}$
-        \State
-
-        \State \textbf{Upon Receive($\langle$ \textsc{JoinReply}, $p$, $membershipTagReceived$, $replicasReceived$ $\rangle$) do:}
-        \State \hspace{1em} $replicas \leftarrow replicasReceived$
-        \State \hspace{1em} $membershipTag \leftarrow membershipTagReceived$
-        \State \hspace{1em} \textbf{Trigger} bebBcastSend(\textsc{Joined}, $replicas, myself$)
-        \State
-
-        \State \textbf{Upon bebBcastDeliver($ \textsc{Joined}, p$) do:}
-        \State \hspace{1em} $replicas \leftarrow replicas \cup \{p\}$
-        \State \hspace{1em} $pendingMembership \leftarrow \bot$
+		\State \textbf{Upon Ping}($p$) \textbf{do:}
+		\State \hspace{3em} \textbf{Send}(Pong, $p$)
+		\State
 
 
-    \end{algorithmic}
+		\State \textbf{Upon Pong}($p$) \textbf{do:}
+		\State \hspace{3em} $currentlyAlive \leftarrow currentlyAlive \cup p$
+		\State
+	\end{algorithmic}
 \end{algorithm}
-  
+
+\begin{algorithm}
+	\caption{Membership Management - Join \& Remove}
+	\begin{algorithmic}
+		\State \textbf{Upon ChangeMembership}(r, ADD) \textbf{do:}
+		\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+		\State \hspace{3em} $pending \leftarrow r$
+		\State \hspace{3em} $pendingMembership \leftarrow r$
+		\State \hspace{3em} $opSeq \leftarrow opSeq + 1$
+		\State \hspace{3em} $answers \leftarrow \{\}$
+		\State \hspace{3em} Trigger bebBcastSend(READ-TAG-MEMBERSHIP, $replicas, \langle opSeq, ADD\rangle$)
+		\State
+
+		\State \textbf{Upon bebBcastDeliver(READ-TAG-MEMBERSHIP, $id$, ACTION$\rangle$, $p$) do:}
+		\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+		\State \hspace{3em} \textbf{Send}(\textsc{Read-Tag-Reply-Membership}, $p$ $\langle id, membershipTag, ACTION\rangle$)
+		\State
+
+		\State \textbf{Upon Receive($\langle$ READ-TAG-REPLY-MEMBERSHIP, $id$, $membershipTag$$, ACTION\rangle$, $p$) do:}
+		\State \hspace{1em} \textbf{If} \textsc{$pending \neq \bot$}:
+		\State \hspace{3em} \textbf{If} $opSeq = id$ \textbf{Then}
+		\State \hspace{4em} $answers \leftarrow answers \cup \{\langle$ \textsc{Read-Tag-Reply-Membership}, $id$, $tag$ $\rangle\}$
+		\State \hspace{4em} \textbf{If} $|answers| = \frac{\#\Pi+1}{2} + 1$ \textbf{Then}
+		\State \hspace{5em} $new\text{-}tag \leftarrow$ \texttt{maxSQTag}($answers$)
+		\State \hspace{5em} $opSeq \leftarrow opSeq + 1$
+		\State \hspace{5em} $answers \leftarrow \{\}$
+		\State \hspace{5em} \textbf{Trigger} bebBcastSend(\textsc{WriteMembership}, $replicas \langle, opSeq$, $\langle new\text{-}tag + 1$, $myself \rangle$, $pending$, ACTION$\rangle$)
+		\State \hspace{5em} $pending \leftarrow \perp$
+		\State
+
+		\State \textbf{Upon bebBcastDeliver($\langle$ WRITEMEMBERSHIP, $id$, $new\text{-}tag$, $r$, ACTION $\rangle$, $p$) do:}
+		\State \hspace{1em} \textbf{If} $new\text{-}tag > tag$ \textbf{Then}
+		\State \hspace{2em} \textbf{If} $ACTION = ADD$ \textbf{Then}
+		\State \hspace{3em} $membershipTag \leftarrow new\text{-}tag$
+		\State \hspace{3em} $pendingMembership \leftarrow r$
+		\State \hspace{2em} \textbf{Else}
+		\State \hspace{3em} $replicas \leftarrow replicas \setminus \{pendingMembership\}$
+		\State \hspace{1em} \textbf{Send}($\langle$ \textsc{MembershipAck}, $p$, $id$ $\rangle$)
+		\State
+
+		\State \textbf{Upon Receive($\langle$ \textsc{MembershipAck}, $p$, $id$, ACTION $\rangle$) do:}
+		\State \hspace{1em} \textbf{If} $opSeq = id$ \textbf{Then}
+		\State \hspace{2em} $answers \leftarrow answers \cup \{\langle$ \textsc{Ack}, $id$ $\rangle\}$
+		\State \hspace{2em} \textbf{If} $|answers| = \frac{N+1}{2} + 1$ \textbf{Then}
+		\State \hspace{3em} $answers \leftarrow \{\}$
+		\State \hspace{3em} \textbf{If} $pending = \perp$ \textbf{Then}
+		\State \hspace{4em} \textbf{If} $ACTION = ADD$ \textbf{Then}
+		\State \hspace{5em} \textbf{Send}($\langle$\textsc{JoinReply}, $pendingMembership$, $membershipTag$, $replicas$ $\rangle$)
+		\State \hspace{4em} \textbf{Else}
+		\State \hspace{5em} $replicas \leftarrow replicas \setminus \{pendingMembership\}$
+		\State
+
+		\State \textbf{Upon Receive($\langle$ \textsc{JoinReply}, $p$, $membershipTagReceived$, $replicasReceived$ $\rangle$) do:}
+		\State \hspace{1em} $replicas \leftarrow replicasReceived$
+		\State \hspace{1em} $membershipTag \leftarrow membershipTagReceived$
+		\State \hspace{1em} \textbf{Trigger} bebBcastSend(\textsc{Joined}, $replicas, myself$)
+		\State
+
+		\State \textbf{Upon bebBcastDeliver($ \textsc{Joined}, p$) do:}
+		\State \hspace{1em} $replicas \leftarrow replicas \cup \{p\}$
+		\State \hspace{1em} $pendingMembership \leftarrow \bot$
+
+
+	\end{algorithmic}
+\end{algorithm}
+
 
 \end{document}
