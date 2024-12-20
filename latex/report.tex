@@ -368,9 +368,9 @@ The Membership Management consists of either a replica joining or leaving the sy
 
 
 
-\section{Tests}
-\label{sec:tests}
-The experimental evaluation was conducted in a distributed environment using three nodes deployed in a cluster configuration. Each test scenario involved executing 5,000, 10,000, and 20,000 operations with a balanced mix of reads and writes. We compared three different consensus protocols: basic Paxos, Multi-Paxos, and ABD (Attiya, Bar-Noy, Dolev). All tests were performed with consistent parameters including quorum size (2 out of 3 nodes) and network conditions.
+\section{Experimentation and Results}
+\label{sec:ExpResults}
+The experimental evaluation was conducted in a distributed environment using four nodes, one as the client and three servers. The test scenario consisted of executing 5,000 operations with a balanced mix of reads and writes. We compared three different consensus protocols: basic Paxos, Multi-Paxos, and ABD (Attiya, Bar-Noy, Dolev). All tests were performed with consistent parameters including quorum size (2 out of 3 nodes) and network conditions. Additionally, for ABD, the timer that executes \verb|pendingOperations| was set to $5~\mu\text{s}$. The value of this interval changes drastically results of the operations, increasing sthe value leeds to higher response times, lowering increases the probability of synchronization issues (see Section \ref{sec:abdlimitfuture})
 \subsubsection{Overall Throughput}
 \begin{figure}[htbp]
 	\centering
@@ -378,7 +378,7 @@ The experimental evaluation was conducted in a distributed environment using thr
 	\caption{Overall Throughput Comparison (5K operations)}
 	\label{fig:throughput}
 \end{figure}
-The throughput analysis reveals significant performance differences among the protocols. Multi-Paxos and ABD demonstrate similar throughput capabilities (70.93 and 71.77 ops/sec respectively), both substantially outperforming basic Paxos (50.89 ops/sec). This performance gap can be attributed to the reduced message complexity in both Multi-Paxos and ABD compared to basic Paxos. The similarity between Multi-Paxos and ABD throughput suggests that both protocols effectively optimize their communication patterns for sustained operation.
+The throughput analysis reveals significant performance differences among the protocols. Multi-Paxos and ABD demonstrate similar throughput capabilities (70.93 and 71.77 ops/sec respectively), both substantially outperforming basic Paxos (50.89 ops/sec). This performance gap can be attributed to the reduced message complexity in both Multi-Paxos and ABD compared to basic Paxos. The similarity between Multi-Paxos and ABD throughput suggests that both implementations of the protocols effectively optimize their communication patterns for sustained operation.
 \subsubsection{Latency Distribution}
 \begin{figure}[htbp]
 	\centering
@@ -407,22 +407,20 @@ Time-series analysis reveals interesting stability patterns. Multi-Paxos shows t
 The experimental results demonstrate that both Multi-Paxos and ABD offer significant improvements over basic Paxos, with Multi-Paxos showing slightly better overall characteristics for balanced workloads. ABD proves particularly efficient for write operations, making it a strong candidate for write-heavy workloads.
 
 \section{Limitations and Future Work}
+\label{sec:limitationsfuture}
 \subsection{Paxos}
+\label{sec:paxoslimitfuture}
 Our current implementation, while functional, has several areas for potential improvement:
-\textbf{Operation Recovery After Leadership Change}
-Currently, when a new leader is elected, pending operations at the old leader are lost. A more robust implementation would include a mechanism to transfer pending operations to the new leader. This could be achieved by having replicas resend their pending operations to the new leader after receiving a LeaderDecidedNotification.
-\textbf{Automatic Failure Detection and Cleanup}
-While our implementation handles leader failure through the heartbeat mechanism, it lacks automatic cleanup of crashed replicas from the membership. Implementing this would require:
+\par \textbf{Operation Recovery After Leadership Change}: Currently, when a new leader is elected, pending operations at the old leader are lost. A more robust implementation would include a mechanism to transfer pending operations to the new leader. This could be achieved by having replicas resend their pending operations to the new leader after receiving a LeaderDecidedNotification.
+\par \textbf{Automatic Failure Detection and Cleanup}: While our implementation handles leader failure through the heartbeat mechanism, it lacks automatic cleanup of crashed replicas from the membership. Implementing this would require:
 \begin{itemize}
   	\setlength\itemsep{0em}
 	\item A failure detection mechanism similar to the leader heartbeat
 	\item A consensus round to remove failed replicas
 	\item State cleanup for removed replicas
 \end{itemize}
-\textbf{Operation Processing Optimization}
-Our current implementation handles operation requests and their execution in the same thread/context - when a request arrives, the handler both processes the request and, if appropriate, executes the propose operation immediately. We attempted to separate these concerns by having request handlers only validate the request and add it to a pendingOperations queue, with a separate periodic timer responsible for processing this queue and executing the propose operations. However, this approach resulted in significant performance degradation compared to the immediate execution model, leading us to maintain the coupled implementation. The cause of this performance issue with the decoupled approach warrants further investigation.
-\textbf{Code and Data Structure Optimization}
-The current implementation has several redundant data structures and classes that could be consolidated:
+\par \textbf{Operation Processing Optimization}: Our current implementation handles operation requests and their execution in the same thread/context - when a request arrives, the handler both processes the request and, if appropriate, executes the propose operation immediately. We attempted to separate these concerns by having request handlers only validate the request and add it to a pendingOperations queue, with a separate periodic timer responsible for processing this queue and executing the propose operations. However, this approach resulted in significant performance degradation compared to the immediate execution model, leading us to maintain the coupled implementation. The cause of this performance issue with the decoupled approach warrants further investigation.
+\par \textbf{Code and Data Structure Optimization}: The current implementation has several redundant data structures and classes that could be consolidated:
 \begin{itemize}
   	\setlength\itemsep{0em}
 	\item Merge similar message types (PaxosMessage variants)
@@ -430,14 +428,22 @@ The current implementation has several redundant data structures and classes tha
 	\item Reduce code duplication in message handlers
 	\item Simplify state tracking across Agreement and SMR protocols
 \end{itemize}
-\textbf{Additional Improvements}
-Several other enhancements could be made to the system:
+\par \textbf{Additional Improvements}: Several other enhancements could be made to the system:
 \begin{itemize}
   	\setlength\itemsep{0em}
 	\item Implement state transfer optimization to reduce the cost of bringing new replicas up-to-date
 	\item Implement snapshotting for faster recovery
 	\item Optimize the communication patterns between replicas
 \end{itemize}
+\subsection{ABD}
+\label{sec:abdlimitfuture}
+\textbf{Implementation Issues}: When testing the ABD implementation with heavier workloads, one of the replicas would stop replying to the application, however, as far as we tested, it would keep on participating in the quorum decisions. Additionally, we've noticed that disabling the logs and slightly increasing the interval from which pendingOperations would be executed would improve it's performance, which led us to believe that the underlying problem could some synchronization issue that would result in a memory race (even if we used Concurrent Data Structures).
+\par \textbf{Timers}: In hindsight, the use of timers to execute pending operations creates multiple synchronization issues, as future work, trying an implementation that didn't relied on timers such as creating threads once a request was received.
+\par \textbf{Membership Management}: We also noticed that when introducing automatic membership management, the system would struggle even more with additional workload. Since it was also implemented with a timer, we also believe that it could be some synchronization issue.
+\par \textbf{Membership Algorithm}: The membership algorithm could be stronger, for instance when removing a replica, replicas other than the one proposing the removal, don't explicitly wait for a quorum to remove the unresponsive replica.
+
+\section{Conclusion}
+\label{conclusion}
 
 
 
