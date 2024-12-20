@@ -442,10 +442,17 @@ Our current implementation, while functional, has several areas for potential im
 \par \textbf{Membership Management}: We also noticed that when introducing automatic membership management, the system would struggle even more with additional workload. Since it was also implemented with a timer, we also believe that it could be some synchronization issue.
 \par \textbf{Membership Algorithm}: The membership algorithm could be stronger, for instance when removing a replica, replicas other than the one proposing the removal, don't explicitly wait for a quorum to remove the unresponsive replica.
 
+
 \section{Conclusion}
 \label{conclusion}
-
-
+Our implementation of Multi-Paxos based State Machine Replication demonstrates the practical viability of achieving consistent replication in distributed systems. The system's architecture, divided into an Agreement protocol for consensus and a State Machine protocol for state management, effectively handles both normal operations and membership changes while maintaining consistency.
+The experimental evaluation revealed several key insights about consensus protocols:
+\begin{itemize}
+\setlength\itemsep{0em}
+\item Multi-Paxos significantly outperforms basic Paxos by reducing message complexity when a stable leader exists, improving overall system throughput by approximately 40%
+\item Message efficiency is substantially improved in Multi-Paxos, requiring only 2 messages per operation after leader election compared to 4 messages in basic Paxos
+\item While ABD showed excellent write performance, Multi-Paxos demonstrated better balance between read and write operations, making it more suitable for mixed workloads
+\end{itemize}
 
 \appendix
 \onecolumn
@@ -676,6 +683,244 @@ Our current implementation, while functional, has several areas for potential im
 
 	\end{algorithmic}
 \end{algorithm}
+
+
+\onecolumn
+\section{Multi-Paxos SMR}
+\label{code:MPSMR}
+
+\begin{algorithm}
+\caption{Multi-Paxos Agreement Protocol}
+\begin{algorithmic}
+\State \textbf{State:}
+\State \hspace{1em} $self$ {identity of this node}
+\State \hspace{1em} $membership$ {list of nodes in the system}
+\State \hspace{1em} $currentLeader$ {current leader node}
+\State \hspace{1em} $isLeader$ {boolean indicating if this node is leader}
+\State \hspace{1em} $listOfProposes$ {map of UUID to PaxosInstance}
+\State \hspace{1em} $decidedMessages$ {map of UUID to LearnMessage}
+\State
+
+\State \textbf{Upon proposeRequest}($instance$, $opId$, $operation$) \textbf{do:}
+\If{$opId \in listOfProposes$}
+\State \Return
+\EndIf
+\If{$\neg isLeader$}
+\State $msg \leftarrow$ new OperationMessage($opId$, $self$, $instance$, $operation$)
+\State \textbf{Send}($msg$, $currentLeader$)
+\State \Return
+\EndIf
+\State $paxosInstance \leftarrow$ new PaxosInstance($opId$, $1$, $membership$, $REGULAR$)
+\State $paxosInstance.proposedValue \leftarrow$ new ProposedValue($REGULAR$, $null$, $operation$)
+\State $listOfProposes[opId] \leftarrow paxosInstance$
+\If{$currentLeader = null$}  \LineComment{Need full Paxos round if no leader}
+\State $msg \leftarrow$ new PrepareMessage($paxosInstance.id$, $paxosInstance.ballot$, $opId$, $REGULAR$)
+\Else \LineComment{Skip prepare phase if leader exists}
+\State $msg \leftarrow$ new AcceptMessage($paxosInstance.id$, $paxosInstance.ballot$, $opId$)
+\EndIf
+\ForAll{$p \in membership \wedge p \neq self$}
+\State \textbf{Send}($msg$, $p$)
+\EndFor
+\State
+
+\State \textbf{Upon Receive}(PrepareMessage, $sender$) \textbf{do:}
+\State $paxosInstance \leftarrow listOfProposes[msg.operationId]$
+\If{$paxosInstance = null$}
+\State $type \leftarrow$ msg.type = JOIN ? JOIN : REGULAR
+\State $paxosInstance \leftarrow$ new PaxosInstance($msg.id$, $msg.ballot$, $membership$, $type$)
+\State $listOfProposes[msg.operationId] \leftarrow paxosInstance$
+\EndIf
+\If{$msg.ballot \geq paxosInstance.ballot$}
+\State $paxosInstance.ballot \leftarrow msg.ballot$
+\State $paxosInstance.promises[sender] \leftarrow true$
+\State $promise \leftarrow$ new PromiseMessage($paxosInstance.id$, $msg.ballot$, $msg.operationId$, $msg.type$)
+\State \textbf{Send}($promise$, $sender$)
+\EndIf
+\State
+
+\State \textbf{Upon Receive}(PromiseMessage, $sender$) \textbf{do:}
+\If{$\neg isLeader$}
+\State \Return
+\EndIf
+\State $paxosInstance \leftarrow listOfProposes[msg.operationId]$
+\State $paxosInstance.promises[sender] \leftarrow true$
+\If{hasQuorum($paxosInstance.promises$)}
+\State $accept \leftarrow$ new AcceptMessage($paxosInstance.id$, $paxosInstance.ballot$, $msg.operationId$)
+\ForAll{$p \in membership \wedge p \neq self$}
+\State \textbf{Send}($accept$, $p$)
+\EndFor
+\EndIf
+\State
+
+\State \textbf{Upon Receive}(AcceptMessage, $sender$) \textbf{do:}
+\State $paxosInstance \leftarrow listOfProposes[msg.operationId]$
+\If{$msg.ballot \geq paxosInstance.ballot$}
+\State $paxosInstance.ballot \leftarrow msg.ballot$
+\State $paxosInstance.accepts[sender] \leftarrow true$
+\State $learn \leftarrow$ new LearnMessage($paxosInstance.id$, $msg.ballot$, $msg.operationId$)
+\State \textbf{Send}($learn$, $currentLeader$)
+\EndIf
+\State
+
+\State \textbf{Upon Receive}(LearnMessage, $sender$) \textbf{do:}
+\State $paxosInstance \leftarrow listOfProposes[msg.operationId]$
+\If{$paxosInstance = null \vee msg.ballot < paxosInstance.ballot$}
+\State \Return
+\EndIf
+\State $proposedValue \leftarrow paxosInstance.proposedValue$
+\State $paxosInstance.accepts[sender] \leftarrow true$
+\If{hasQuorum($paxosInstance.accepts$)}
+\If{$proposedValue.type = LEADER\_ELECTION$}
+\State $newLeader \leftarrow proposedValue.host$
+\State $currentLeader \leftarrow newLeader$
+\State $isLeader \leftarrow newLeader = self$
+\State \textbf{Trigger} leaderDecidedNotification($msg.operationId$, $newLeader$)
+\EndIf
+\State $listOfProposes \leftarrow listOfProposes \setminus \{msg.operationId\}$
+\If{$isLeader$}
+\State $decidedMessages[msg.operationId] \leftarrow msg$
+\State $payload \leftarrow proposedValue \neq null$ ? $proposedValue.value$ : $null$
+\ForAll{$p \in membership$}
+\State $decided \leftarrow$ new DecidedMessage($msg.operationId$, $membership$, $payload$)
+\State \textbf{Send}($decided$, $p$)
+\EndFor
+\EndIf
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{Multi-Paxos Leader Election and Membership Management}
+\begin{algorithmic}
+\State \textbf{State:}
+\State \hspace{1em} $LEADER\_TIMEOUT = 5000$ {milliseconds}
+\State \hspace{1em} $receivedHeartbeat$ {boolean flag for heartbeat reception}
+\State
+
+\State \textbf{Upon Init}($initialMembership$) \textbf{do:}
+\If{$self = membership[0]$}
+\State $isLeader \leftarrow true$
+\State $currentLeader \leftarrow self$
+\State \textbf{Setup Periodic Timer} HeartbeatTimer($LEADER\_TIMEOUT/2$)
+\Else
+\State $isLeader \leftarrow false$
+\State $currentLeader \leftarrow membership[0]$
+\State \textbf{Setup Periodic Timer} LeaderTimer($LEADER\_TIMEOUT$)
+\EndIf
+\State
+
+\State \textbf{Upon Timer} HeartbeatTimer \textbf{do:}
+\If{$isLeader$}
+\State $heartbeat \leftarrow$ new HeartbeatMessage()
+\ForAll{$p \in membership \wedge p \neq self$}
+\State \textbf{Send}($heartbeat$, $p$)
+\EndFor
+\EndIf
+\State
+
+\State \textbf{Upon Timer} LeaderTimer \textbf{do:}
+\If{$\neg isLeader \wedge \neg receivedHeartbeat$}
+\State \Call{StartLeaderElection}{}
+\EndIf
+\State $receivedHeartbeat \leftarrow false$
+\State
+
+\State \textbf{Upon joinRequest}($instance$, $opId$, $node$) \textbf{do:}
+\If{$\neg isLeader$}
+\State $msg \leftarrow$ new JoinMessage($opId$, $node$)
+\State \textbf{Send}($msg$, $currentLeader$)
+\State \Return
+\EndIf
+\If{$|membership| < 3$}
+\State $membership \leftarrow membership \cup \{node\}$
+\State $stateTransfer \leftarrow$ new StateTransferMessage($appState$, $membership$)
+\State \textbf{Send}($stateTransfer$, $node$)
+\State \Return
+\EndIf
+\State $proposeRequest \leftarrow$ new ProposeRequest($instance$, $opId$, $JOIN$, $node$)
+\State \textbf{Trigger} proposeRequest
+\State
+
+\State \textbf{Procedure} StartLeaderElection()
+\State $currentLeader \leftarrow \bot$
+\State $electionId \leftarrow$ generateUUID()
+\State $ballot \leftarrow$ generateNewBallot()
+\State $paxosInstance \leftarrow$ new PaxosInstance($electionId$, $ballot$, $membership$, $LEADER\_ELECTION$)
+\State $paxosInstance.proposedValue \leftarrow$ new ProposedValue($LEADER\_ELECTION$, $self$, $null$)
+\State $msg \leftarrow$ new PrepareMessage($electionId$, $ballot$, $electionId$, $LEADER\_ELECTION$)
+\ForAll{$p \in membership$}
+\State \textbf{Send}($msg$, $p$)
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{State Machine Protocol}
+\begin{algorithmic}
+\State \textbf{State:}
+\State \hspace{1em} $self$ {current node identity}
+\State \hspace{1em} $membership$ {list of current members}
+\State \hspace{1em} $currentLeader$ {current leader node}
+\State \hspace{1em} $isLeader$ {boolean indicating if this node is leader}
+\State \hspace{1em} $ready$ {boolean indicating readiness to process operations}
+\State \hspace{1em} $nextInstance$ {next instance number for operations}
+\State \hspace{1em} $decided$ {set of decided operations}
+\State \hspace{1em} $appState$ {application state - key-value map}
+\State
+
+\State \textbf{Upon orderRequest}($opId$, $operation$) \textbf{do:}
+\If{$\neg ready$}
+\State \Return
+\EndIf
+\If{$opId \in decided$}
+\State \Return
+\EndIf
+\If{$\neg isLeader$}
+\State $msg \leftarrow$ new OperationMessage($opId$, $self$, $nextInstance$, $operation$)
+\State \textbf{Send}($msg$, $currentLeader$)
+\State \Return
+\EndIf
+\State $proposeRequest \leftarrow$ new ProposeRequest($nextInstance$, $opId$, $operation$)
+\State $nextInstance \leftarrow nextInstance + 1$
+\State \textbf{Trigger} proposeRequest
+\State
+
+\State \textbf{Upon nodeDecidedNotification}($opId$, $type$, $node$) \textbf{do:}
+\If{$node \in membership$}
+\State \Return
+\EndIf
+\State $membership \leftarrow membership \cup \{node\}$
+\If{$isLeader$}
+\State $stateTransfer \leftarrow$ new StateTransferMessage($appState$, $membership$)
+\State \textbf{Send}($stateTransfer$, $node$)
+\EndIf
+\State
+
+\State \textbf{Upon decisionNotification}($opId$, $decision$, $membership$, $payload$) \textbf{do:}
+\If{$opId \in decided$}
+\State \Return
+\EndIf
+\If{$decision = COMMIT$}
+\State $nextInstance \leftarrow nextInstance + 1$
+\State $decided \leftarrow decided \cup \{opId\}$
+\If{$payload \neq null$}
+\State \Call{ExecuteOperation}{$opId$, $payload$}
+\EndIf
+\EndIf
+\State
+
+\State \textbf{Upon leaderDecidedNotification}($opId$, $newLeader$) \textbf{do:}
+\State $currentLeader \leftarrow newLeader$
+\State $isLeader \leftarrow newLeader = self$
+\If{$isLeader$}
+\State $ready \leftarrow true$
+\Else
+\State \textbf{Open Connection}($currentLeader$)
+\EndIf
+
+\end{algorithmic}
+\end{algorithm}
+
 
 
 \end{document}
