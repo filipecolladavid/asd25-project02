@@ -74,7 +74,6 @@ public class ABD extends GenericProtocol {
     private Boolean ready;
     private Boolean inMembershipOperation;
     private Boolean heathCheckComplete;
-    private Boolean isLeader;
 
     /**
      * State Replicated
