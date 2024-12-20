@@ -1,4 +1,7 @@
 \documentclass[10pt,a4paper,twocolumn]{article}
+\usepackage{graphicx}  % For including images
+\usepackage{amsmath}   % For math symbols
+\usepackage{siunitx}   % For SI units
 
 %\renewcommand{\section}{\section{\bold{#1}}
 
@@ -405,6 +408,44 @@ The Membership Management consists of either a replica joining or leaving the sy
 \par The implementation of this membership management protocol is, effectively, a an ABD write operation.
 
 
+
+\section{Tests}
+\label{sec:tests}
+The experimental evaluation was conducted in a distributed environment using three nodes deployed in a cluster configuration. Each test scenario involved executing 5,000, 10,000, and 20,000 operations with a balanced mix of reads and writes. We compared three different consensus protocols: basic Paxos, Multi-Paxos, and ABD (Attiya, Bar-Noy, Dolev). All tests were performed with consistent parameters including quorum size (2 out of 3 nodes) and network conditions.
+\subsubsection{Overall Throughput}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.45\textwidth]{figures/throughput.pdf}
+    \caption{Overall Throughput Comparison (5K operations)}
+    \label{fig:throughput}
+\end{figure}
+The throughput analysis reveals significant performance differences among the protocols. Multi-Paxos and ABD demonstrate similar throughput capabilities (70.93 and 71.77 ops/sec respectively), both substantially outperforming basic Paxos (50.89 ops/sec). This performance gap can be attributed to the reduced message complexity in both Multi-Paxos and ABD compared to basic Paxos. The similarity between Multi-Paxos and ABD throughput suggests that both protocols effectively optimize their communication patterns for sustained operation.
+\subsubsection{Latency Distribution}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.45\textwidth]{figures/latency.pdf}
+    \caption{Latency Distribution by Protocol}
+    \label{fig:latency}
+\end{figure}
+Latency measurements show distinct characteristics for each protocol. Basic Paxos exhibits the highest latencies (read: $48,245~\mu\text{s}$, write: $48,444~\mu\text{s}$), while Multi-Paxos achieves the most balanced and lowest overall latencies (read: $31,977~\mu\text{s}$, write: $31,357~\mu\text{s}$). ABD shows an interesting asymmetric pattern with excellent write latency ($30,313~\mu\text{s}$) but higher read latency ($37,825~\mu\text{s}$). This asymmetry in ABD reflects its protocol design, which optimizes for write operations at the cost of slightly higher read complexity.
+\subsubsection{Network Communication Efficiency}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.45\textwidth]{figures/network.pdf}
+    \caption{Network Communication Efficiency}
+    \label{fig:network}
+\end{figure}
+The network efficiency analysis highlights the messaging overhead of each protocol. Basic Paxos requires 4 messages per operation, resulting in approximately 20,000 messages for 5,000 operations. Multi-Paxos achieves the best efficiency with 2 messages per operation (10,000 total messages) after leader election. ABD maintains a middle ground with 3 messages per operation on average (15,000 total messages). This metric directly correlates with the observed throughput performance, demonstrating how message complexity impacts overall system efficiency.
+\subsubsection{Performance Over Time}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.45\textwidth]{figures/performance.pdf}
+    \caption{Performance Over Time}
+    \label{fig:performance}
+\end{figure}
+Time-series analysis reveals interesting stability patterns. Multi-Paxos shows the most stable performance, maintaining consistent throughput around 120 ops/sec during peak operation. ABD demonstrates good stability but with lower peak throughput (around 90 ops/sec), while basic Paxos stabilizes at the lowest level (around 67 ops/sec). All protocols show some initial ramp-up period, with Multi-Paxos achieving optimal performance fastest.
+\subsubsection{Summary}
+The experimental results demonstrate that both Multi-Paxos and ABD offer significant improvements over basic Paxos, with Multi-Paxos showing slightly better overall characteristics for balanced workloads. ABD proves particularly efficient for write operations, making it a strong candidate for write-heavy workloads.
 
 
 \appendix

@@ -5,7 +5,6 @@
 *.log
 *.out
 *.synctex.gz
-*.pdf
 *.bst
 *.fdb*
 *.fls
