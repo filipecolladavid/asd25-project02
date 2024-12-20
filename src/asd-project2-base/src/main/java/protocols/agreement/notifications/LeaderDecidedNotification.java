@@ -6,9 +6,9 @@ import java.util.UUID;
 import pt.unl.fct.di.novasys.babel.generic.ProtoNotification;
 import pt.unl.fct.di.novasys.network.data.Host;
 
-public class DecidedNotification extends ProtoNotification {
+public class LeaderDecidedNotification extends ProtoNotification {
 
-    public static final short NOTIFICATION_ID = 101;
+    public static final short NOTIFICATION_ID = 103;
 
     public enum DecisionType {
         COMMIT,
@@ -17,15 +17,15 @@ public class DecidedNotification extends ProtoNotification {
 
     private final UUID operationId;
     private final DecisionType decisionType;
-    private final byte[] operationPayload;
+    private final Host newLeaderHost;
     private final LinkedList<Host> membership;
 
-    public DecidedNotification(UUID operationId, DecisionType decisionType, LinkedList<Host> membership,
-            byte[] operationPayload) {
+    public LeaderDecidedNotification(UUID operationId, DecisionType decisionType, LinkedList<Host> membership,
+            Host newLeaderHost) {
         super(NOTIFICATION_ID);
         this.operationId = operationId;
         this.decisionType = decisionType;
-        this.operationPayload = operationPayload;
+        this.newLeaderHost = newLeaderHost;
         this.membership = membership;
     }
 
@@ -37,8 +37,8 @@ public class DecidedNotification extends ProtoNotification {
         return decisionType;
     }
 
-    public byte[] getOperationPayload() {
-        return this.operationPayload;
+    public Host getNewLeaderHost() {
+        return this.newLeaderHost;
     }
 
     public LinkedList<Host> getMembership() {
@@ -49,7 +49,7 @@ public class DecidedNotification extends ProtoNotification {
     public String toString() {
         return "DecidedNotification{" +
                 "operationId=" + this.operationId +
-                ", operationPayload=" + this.operationPayload +
+                ", newLeaderHost=" + this.newLeaderHost +
                 ", decisionType=" + this.decisionType +
                 ", membership=" + this.membership +
                 '}';

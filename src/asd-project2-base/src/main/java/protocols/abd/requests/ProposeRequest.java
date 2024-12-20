@@ -1,19 +1,22 @@
-package protocols.agreement.requests;
+package protocols.abd.requests;
 
-import java.util.UUID;
+import org.apache.commons.codec.binary.Hex;
 import pt.unl.fct.di.novasys.babel.generic.ProtoRequest;
 
+import java.util.UUID;
+
 public class ProposeRequest extends ProtoRequest {
-    public static final short REQUEST_ID = 101;
+
+    public static final short REQUEST_ID = 102;
 
     private final int instance;
-    private final UUID operationId;
+    private final UUID opId;
     private final byte[] operation;
 
-    public ProposeRequest(int instance, UUID operationId, byte[] operation) {
+    public ProposeRequest(int instance, UUID opId, byte[] operation) {
         super(REQUEST_ID);
         this.instance = instance;
-        this.operationId = operationId;
+        this.opId = opId;
         this.operation = operation;
     }
 
@@ -25,17 +28,16 @@ public class ProposeRequest extends ProtoRequest {
         return operation;
     }
 
-    public UUID getOperationId() {
-        return operationId;
+    public UUID getOpId() {
+        return opId;
     }
 
     @Override
     public String toString() {
-        return "ProposedRequest{" +
+        return "ProposeRequest{" +
                 "instance=" + instance +
-                ", operationId=" + operationId +
-                ", operation=" + operation +
+                ", opId=" + opId +
+                ", operation=" + Hex.encodeHexString(operation) +
                 '}';
     }
-
 }

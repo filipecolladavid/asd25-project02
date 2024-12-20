@@ -1,0 +1,60 @@
+╭─ ~/personal/masters/asd/asd25-project02/src/asd-project2-base/client on paxos                                                                   ✘ INT at 15:05:22
+╰─❯ ./exec.sh 5 1024 127.0.0.1:35000,127.0.0.1:35001,127.0.0.1:35002,127.0.0.1:35003,127.0.0.1:35004 0 100
+
+2024-12-14 15:06:06:977 0 sec: 0 operations; est completion in 0 second
+Waiting for server connections
+Connected to all servers!
+2024-12-14 15:06:11:960 5 sec: 16118 operations; 3223.6 current ops/sec; est completion in 1 minute [UPDATE AverageLatency(us)=1430.24]
+2024-12-14 15:06:16:960 10 sec: 40532 operations; 4882.8 current ops/sec; est completion in 1 minute [UPDATE AverageLatency(us)=1021.31]
+2024-12-14 15:06:21:960 15 sec: 64457 operations; 4785 current ops/sec; est completion in 55 seconds [UPDATE AverageLatency(us)=1042.84]
+2024-12-14 15:06:26:960 20 sec: 88616 operations; 4831.8 current ops/sec; est completion in 48 seconds [UPDATE AverageLatency(us)=1033.19]
+2024-12-14 15:06:31:960 25 sec: 111474 operations; 4571.6 current ops/sec; est completion in 43 seconds [UPDATE AverageLatency(us)=1091.69]
+2024-12-14 15:06:36:960 30 sec: 134194 operations; 4544 current ops/sec; est completion in 38 seconds [UPDATE AverageLatency(us)=1099.13]
+2024-12-14 15:06:41:960 35 sec: 157502 operations; 4661.6 current ops/sec; est completion in 32 seconds [UPDATE AverageLatency(us)=1070.99]
+2024-12-14 15:06:46:960 40 sec: 179648 operations; 4429.2 current ops/sec; est completion in 27 seconds [UPDATE AverageLatency(us)=1126.57]
+2024-12-14 15:06:51:960 45 sec: 202347 operations; 4539.8 current ops/sec; est completion in 22 seconds [CLEANUP AverageLatency(us)=1] [UPDATE AverageLatency(us)=1029.9]
+2024-12-14 15:06:56:960 50 sec: 225233 operations; 4577.2 current ops/sec; est completion in 17 seconds  [UPDATE AverageLatency(us)=872.11]
+2024-12-14 15:07:01:960 55 sec: 247758 operations; 4505 current ops/sec; est completion in 12 seconds  [UPDATE AverageLatency(us)=886.16]
+2024-12-14 15:07:06:960 60 sec: 270317 operations; 4511.8 current ops/sec; est completion in 7 second  [UPDATE AverageLatency(us)=885.01]
+2024-12-14 15:07:11:960 65 sec: 292204 operations; 4377.4 current ops/sec; est completion in 2 second [CLEANUP AverageLatency(us)=0] [UPDATE AverageLatency(us)=658.11]
+2024-12-14 15:07:14:502 67 sec: 300000 operations; 3066.88 current ops/sec; [CLEANUP AverageLatency(us)=1] [UPDATE AverageLatency(us)=324.68]
+[OVERALL], RunTime(ms), 67542
+[OVERALL], Throughput(ops/sec), 4441.680731988985
+[TOTAL_GCS_G1_Young_Generation], Count, 39
+[TOTAL_GC_TIME_G1_Young_Generation], Time(ms), 87
+[TOTAL_GC_TIME_%_G1_Young_Generation], Time(%), 0.12880874122768057
+[TOTAL_GCS_G1_Concurrent_GC], Count, 0
+[TOTAL_GC_TIME_G1_Concurrent_GC], Time(ms), 0
+[TOTAL_GC_TIME_%_G1_Concurrent_GC], Time(%), 0.0
+[TOTAL_GCS_G1_Old_Generation], Count, 0
+[TOTAL_GC_TIME_G1_Old_Generation], Time(ms), 0
+[TOTAL_GC_TIME_%_G1_Old_Generation], Time(%), 0.0
+[TOTAL_GCs], Count, 39
+[TOTAL_GC_TIME], Time(ms), 87
+[TOTAL_GC_TIME_%], Time(%), 0.12880874122768057
+[CLEANUP], Operations, 5
+[CLEANUP], AverageLatency(us), 0.4
+[CLEANUP], MinLatency(us), 0
+[CLEANUP], MaxLatency(us), 1
+[CLEANUP], 0, 1.0
+[CLEANUP], 15000, 0.0
+[CLEANUP], 20000, 0.5
+[UPDATE], Operations, 300000
+[UPDATE], AverageLatency(us), 993.1154533333333
+[UPDATE], MinLatency(us), 219
+[UPDATE], MaxLatency(us), 72549
+[UPDATE], Return=OK, 300000
+[UPDATE], 0, 1388.8469863469863
+[UPDATE], 5000, 1023.6733051369441
+[UPDATE], 10000, 1039.4854417461574
+[UPDATE], 15000, 1034.5098453757826
+[UPDATE], 20000, 1097.1028086677509
+[UPDATE], 25000, 1095.402186800158
+[UPDATE], 30000, 1072.7952329826069
+[UPDATE], 35000, 1127.8014456742715
+[UPDATE], 40000, 1014.1715218926554
+[UPDATE], 45000, 869.3049518749183
+[UPDATE], 50000, 889.4801942699282
+[UPDATE], 55000, 885.4649605251486
+[UPDATE], 60000, 620.2885833607057
+[UPDATE], 65000, 322.13272069900574

@@ -2,8 +2,8 @@ import pt.unl.fct.di.novasys.babel.core.Babel;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-// import protocols.abd.ABD;
-import protocols.agreement.IncorrectAgreement;
+import protocols.abd.ABD;
+import protocols.agreement.Agreement;
 import protocols.app.HashApp;
 import protocols.app.HashApp.ReplicationStrategy;
 import protocols.statemachine.StateMachine;
@@ -47,9 +47,9 @@ public class Main {
 
 		// Application
 		HashApp hashApp = new HashApp(props);
-		StateMachine sm  = null;
-		// ABD abd = null;
-		IncorrectAgreement agreement = null;
+        StateMachine sm = null;
+        ABD abd = null;
+        Agreement agreement = null;
 		
 		//Register applications in babel
 		babel.registerProtocol(hashApp);
@@ -60,14 +60,13 @@ public class Main {
 			// StateMachine Protocol
 			sm = new StateMachine(props);
 			// Agreement Protocol
-			agreement = new IncorrectAgreement(props);
+			agreement = new Agreement(props);
 			babel.registerProtocol(sm);
 			babel.registerProtocol(agreement);
 		} else {
 			System.err.println("Loading ABD protocol stack");
-
-			// abd = new ABD(props);
-			// babel.registerProtocol(abd);
+			abd = new ABD(props);
+			babel.registerProtocol(abd);
 		}
 
 
@@ -78,7 +77,7 @@ public class Main {
 			sm.init(props);
 			agreement.init(props);
 		} else {
-			// abd.init(props);
+			abd.init(props);
 		}
 
 		//Start babel and protocol threads
