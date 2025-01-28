@@ -1,4 +1,15 @@
 # Project Phase 2
+The project focuses on the
+study and implementation of a distributed system for managing the state of a key-value (KV) map. The KV
+map will be managed in two separate system models that you must implement:
+<ul>
+    <li> a State Machine Replication (SMR) algorithm [4], followed by a Multi-Paxos [3] Agreement protocol;</li>
+    <li>an ABD Quorum [1] protocol.</li>
+</ul>
+In the case of SMR + Multi-Paxos, it is the SMR algorithm that manages the overall state and membership of the system. The SMR algorithm will use an underlying agreement protocol to decide consensus
+on the ordering of operations, via Multi-Paxos. In the case of ABD, there is a single protocol that manages
+the membership, state, and ordering of operations that are executed, via the application of the ABD agreement. In both cases, the agreement and membership functionality must use some sort of coherent broadcast
+mechanism for sending messages to other nodes in the system.
 
 ## Organisational details
 
