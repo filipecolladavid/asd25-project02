@@ -139,13 +139,21 @@ public class Agreement extends GenericProtocol {
                 .setProposedValue(new ProposedValue(ProposedValue.OperationType.REGULAR, null, request.getOperation()));
         this.listOfProposes.put(request.getOperationId(), paxosInstance);
 
-        PreparePaxosMessage preparePaxosMessage = new PreparePaxosMessage(paxosInstance.getId(),
-                paxosInstance.getBallot(),
-                request.getOperationId(), PreparePaxosMessage.OperationType.REGULAR);
+        ProtoMessage paxosFirstMessage;
+
+        if (this.currentLeader == null) {
+            paxosFirstMessage = new PreparePaxosMessage(paxosInstance.getId(),
+                    paxosInstance.getBallot(),
+                    request.getOperationId(), PreparePaxosMessage.OperationType.REGULAR);
+        } else {
+            paxosFirstMessage = new AcceptPaxosMessage(paxosInstance.getId(),
+                    paxosInstance.getBallot(),
+                    request.getOperationId());
+        }
 
         for (Host host : this.membership) {
             this.openConnection(host);
-            sendMessage(preparePaxosMessage, host);
+            sendMessage(paxosFirstMessage, host);
         }
     }
 
@@ -180,13 +188,23 @@ public class Agreement extends GenericProtocol {
         paxosInstance.setProposedValue(new ProposedValue(ProposedValue.OperationType.JOIN, joiningNode, null));
         this.listOfProposes.put(operationId, paxosInstance);
 
-        PreparePaxosMessage preparePaxosMessage = new PreparePaxosMessage(paxosInstance.getId(),
-                paxosInstance.getBallot(),
-                operationId, PreparePaxosMessage.OperationType.JOIN);
+        ProtoMessage paxosFirstMessage;
+        if (this.currentLeader == null) {
+            logger.info("No leader yet, sending PreparePaxosMessage");
+            paxosFirstMessage = new PreparePaxosMessage(paxosInstance.getId(),
+                    paxosInstance.getBallot(),
+                    operationId, PreparePaxosMessage.OperationType.JOIN);
+        } else {
+            logger.info("Already have a leader, Sending AcceptPaxosMessage");
+            paxosFirstMessage = new AcceptPaxosMessage(paxosInstance.getId(),
+                    paxosInstance.getBallot(),
+                    operationId);
+        }
+
         for (Host host : this.membership) {
             if (!host.equals(self)) {
                 this.openConnection(host);
-                sendMessage(preparePaxosMessage, host);
+                sendMessage(paxosFirstMessage, host);
             }
         }
     }
@@ -349,9 +367,16 @@ public class Agreement extends GenericProtocol {
     public void uponAcceptPaxosMessage(AcceptPaxosMessage msg, Host host, short sourceProto, int channelId) {
         PaxosInstance paxosInstance = this.listOfProposes.get(msg.getOperationID());
         int msgBallot = msg.getBallot();
-        int paxosBallot = paxosInstance.getBallot();
 
-        if (paxosInstance == null || msgBallot < paxosBallot) {
+        if (paxosInstance == null) {
+            paxosInstance = new PaxosInstance(msg.getOperationID(), msgBallot,
+                    this.membership,
+                    PaxosInstance.InstanceType.REGULAR);
+            this.listOfProposes.put(msg.getOperationID(), paxosInstance);
+        }
+
+        int paxosBallot = paxosInstance.getBallot();
+        if (msgBallot < paxosBallot) {
             return;
         }
 
@@ -466,6 +491,8 @@ public class Agreement extends GenericProtocol {
     }
 
     private void startLeaderElection() {
+        this.currentLeader = null;
+
         UUID electionOperationId = UUID.randomUUID();
 
         PaxosInstance paxosInstance = new PaxosInstance(electionOperationId, 1, this.membership,

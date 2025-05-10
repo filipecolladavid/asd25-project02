@@ -290,8 +290,6 @@ public class StateMachine extends GenericProtocol {
 
     /* Execute Operation and Send Notification */
     private void executeOperation(UUID operationId, byte[] payload) {
-        logger.info("Executing operation {}", operationId);
-
         if (payload == null)
             return;
 
